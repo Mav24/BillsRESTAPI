@@ -41,6 +41,14 @@ public class BillsApiTests : IClassFixture<WebApplicationFactory<Program>>, IDis
                 });
             });
         });
+
+        // Create the test database schema explicitly
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            db.Database.EnsureCreated();
+        }
+
         _client = _factory.CreateClient();
     }
 
