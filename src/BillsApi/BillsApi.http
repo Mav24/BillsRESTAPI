@@ -1,0 +1,35 @@
+@BillsApi_HostAddress = http://localhost:5202
+
+### Get all bills
+GET {{BillsApi_HostAddress}}/bills
+Accept: application/json
+
+### Get single bill by ID
+GET {{BillsApi_HostAddress}}/bills/1
+Accept: application/json
+
+### Create a new bill
+POST {{BillsApi_HostAddress}}/bills
+Content-Type: application/json
+
+{
+  "billName": "Electricity",
+  "amount": 125.50,
+  "date": "2024-01-15T00:00:00",
+  "amountOverMinimum": 20.50
+}
+
+### Update a bill
+PUT {{BillsApi_HostAddress}}/bills/1
+Content-Type: application/json
+
+{
+  "billName": "Electricity",
+  "amount": 135.50,
+  "date": "2024-01-15T00:00:00",
+  "amountOverMinimum": 30.50
+}
+
+### Delete a bill
+DELETE {{BillsApi_HostAddress}}/bills/1
+
