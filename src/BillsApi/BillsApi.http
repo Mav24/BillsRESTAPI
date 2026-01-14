@@ -1,27 +1,50 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjNkZWE4MDhmLTVlZDctNGMzNi05MTk2LTk2NDRjYTNlNmFjMiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJ0ZXN0dXNlciIsImV4cCI6MTc2ODQ0ODYxNCwiaXNzIjoiQmlsbHNBcGkiLCJhdWQiOiJCaWxsc0FwaVVzZXJzIn0.Xq3oiTqrheOfa-2-w--ItIX3AFNH32c9qR6UUQNJPS4
 
-### Get all bills
-GET {{BillsApi_HostAddress}}/bills
-Accept: application/json
-
-### Get single bill by ID
-GET {{BillsApi_HostAddress}}/bills/2
-Accept: application/json
-
-### Create a new bill
-POST {{BillsApi_HostAddress}}/bills
+### Register a new user
+POST {{BillsApi_HostAddress}}/auth/register
 Content-Type: application/json
 
 {
-  "billName": "Hello world",
-  "amount": 1000.00,
-  "date": "2025-01-15T00:00:00",
-  "amountOverMinimum": 20.00
+  "username": "Maverick",
+  "password": "password123"
 }
 
-### Update a bill
+### Login to get JWT token
+POST {{BillsApi_HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+### Get all bills (requires authentication)
+GET {{BillsApi_HostAddress}}/bills
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Get single bill by ID (requires authentication)
+GET {{BillsApi_HostAddress}}/bills/2
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create a new bill (requires authentication)
+POST {{BillsApi_HostAddress}}/bills
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "billName": "Maverick's",
+  "amount": 100.00,
+  "date": "2026-01-15T00:00:00",
+  "amountOverMinimum": 0.00
+}
+
+### Update a bill (requires authentication)
 PUT {{BillsApi_HostAddress}}/bills/1
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
   "billName": "Update",
@@ -30,6 +53,7 @@ Content-Type: application/json
   "amountOverMinimum": 30.50
 }
 
-### Delete a bill
+### Delete a bill (requires authentication)
 DELETE {{BillsApi_HostAddress}}/bills/1
+Authorization: Bearer {{token}}
 

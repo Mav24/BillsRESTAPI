@@ -2,6 +2,9 @@
 bin/
 obj/
 
+# Secrets - DO NOT COMMIT
+appsettings.Secrets.json
+
 # Database files
 *.db
 *.db-journal

@@ -11,6 +11,11 @@ public class Bill
     public int Id { get; set; }
 
     /// <summary>
+    /// The ID of the user who owns this bill.
+    /// </summary>
+    public required string UserId { get; set; }
+
+    /// <summary>
     /// Name/description of the bill (e.g., "Electricity", "Gas", "Water").
     /// </summary>
     public required string BillName { get; set; }
