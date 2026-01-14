@@ -1,11 +1,11 @@
-@BillsApi_HostAddress = http://localhost:5202
+@BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
 
 ### Get all bills
 GET {{BillsApi_HostAddress}}/bills
 Accept: application/json
 
 ### Get single bill by ID
-GET {{BillsApi_HostAddress}}/bills/1
+GET {{BillsApi_HostAddress}}/bills/2
 Accept: application/json
 
 ### Create a new bill
@@ -13,10 +13,10 @@ POST {{BillsApi_HostAddress}}/bills
 Content-Type: application/json
 
 {
-  "billName": "Electricity",
-  "amount": 125.50,
-  "date": "2024-01-15T00:00:00",
-  "amountOverMinimum": 20.50
+  "billName": "Hello world",
+  "amount": 1000.00,
+  "date": "2025-01-15T00:00:00",
+  "amountOverMinimum": 20.00
 }
 
 ### Update a bill
@@ -24,7 +24,7 @@ PUT {{BillsApi_HostAddress}}/bills/1
 Content-Type: application/json
 
 {
-  "billName": "Electricity",
+  "billName": "Update",
   "amount": 135.50,
   "date": "2024-01-15T00:00:00",
   "amountOverMinimum": 30.50
