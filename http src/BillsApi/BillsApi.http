@@ -1,0 +1,33 @@
+@BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
+@accessToken = <paste_access_token_here>
+@refreshToken = <paste_refresh_token_here>
+
+### Login to get tokens
+POST {{BillsApi_HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+### Refresh access token
+POST {{BillsApi_HostAddress}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout (revoke refresh token)
+POST {{BillsApi_HostAddress}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Get all bills (use accessToken now)
+GET {{BillsApi_HostAddress}}/bills
+Accept: application/json
+Authorization: Bearer {{accessToken}}

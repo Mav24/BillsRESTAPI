@@ -1,4 +1,4 @@
-using BillsApi.Data;
+﻿using BillsApi.Data;
 using BillsApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +86,10 @@ builder.Services.AddDbContext<BillsDbContext>(options =>
     {
         options.UseSqlServer(connectionString);
     }
+    
+    // Suppress the pending model changes warning
+    options.ConfigureWarnings(warnings => 
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 
 var app = builder.Build();
@@ -94,6 +98,12 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    // Temporary: Show detailed errors in production to diagnose issue
+    app.UseDeveloperExceptionPage();
 }
 
 // Apply CORS policy
@@ -112,12 +122,13 @@ if (!app.Environment.IsDevelopment())
 // Map health check endpoint
 app.MapHealthChecks("/health");
 
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
-    db.Database.EnsureCreated();
-}
+// Ensure database is created and migrations are applied
+// TEMPORARILY DISABLED - Tables already exist in SQL Server
+// using (var scope = app.Services.CreateScope())
+// {
+//     var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+//     db.Database.Migrate();
+// }
 
 // POST /auth/register - Register a new user
 app.MapPost("/auth/register", async (RegisterRequest request, BillsDbContext db) =>
@@ -151,7 +162,7 @@ app.MapPost("/auth/register", async (RegisterRequest request, BillsDbContext db)
 })
 .WithName("Register");
 
-// POST /auth/login - Login and get JWT token
+// POST /auth/login - Login and get JWT + Refresh token
 app.MapPost("/auth/login", async (LoginRequest request, BillsDbContext db, IConfiguration config) =>
 {
     var user = await db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
@@ -163,28 +174,64 @@ app.MapPost("/auth/login", async (LoginRequest request, BillsDbContext db, IConf
 
     var jwtSettings = config.GetSection("Jwt");
     var secretKey = jwtSettings["SecretKey"]!;
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-    var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    var accessToken = GenerateAccessToken(user, jwtSettings, secretKey);
+    var refreshToken = await GenerateRefreshTokenAsync(user.Id, db);
 
-    var claims = new[]
-    {
-        new Claim(ClaimTypes.NameIdentifier, user.Id),
-        new Claim(ClaimTypes.Name, user.Username)
-    };
-
-    var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
-        issuer: jwtSettings["Issuer"],
-        audience: jwtSettings["Audience"],
-        claims: claims,
-        expires: DateTime.UtcNow.AddHours(24),
-        signingCredentials: credentials
-    );
-
-    var tokenString = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
-
-    return Results.Ok(new { token = tokenString });
+    return Results.Ok(new 
+    { 
+        accessToken,
+        refreshToken = refreshToken.Token,
+        expiresIn = 900 // 15 minutes in seconds
+    });
 })
 .WithName("Login");
+
+// POST /auth/refresh - Get new access token using refresh token
+app.MapPost("/auth/refresh", async (RefreshRequest request, BillsDbContext db, IConfiguration config) =>
+{
+    var storedToken = await db.RefreshTokens
+        .Include(rt => rt.User)
+        .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken);
+
+    if (storedToken is null || storedToken.IsRevoked || storedToken.ExpiresAt < DateTime.UtcNow)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Revoke old refresh token (rotation for security)
+    storedToken.IsRevoked = true;
+
+    var jwtSettings = config.GetSection("Jwt");
+    var secretKey = jwtSettings["SecretKey"]!;
+    var accessToken = GenerateAccessToken(storedToken.User!, jwtSettings, secretKey);
+    var newRefreshToken = await GenerateRefreshTokenAsync(storedToken.UserId, db);
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new 
+    { 
+        accessToken,
+        refreshToken = newRefreshToken.Token,
+        expiresIn = 900
+    });
+})
+.WithName("RefreshToken");
+
+// POST /auth/logout - Revoke refresh token
+app.MapPost("/auth/logout", async (RefreshRequest request, BillsDbContext db) =>
+{
+    var storedToken = await db.RefreshTokens
+        .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken);
+
+    if (storedToken is not null)
+    {
+        storedToken.IsRevoked = true;
+        await db.SaveChangesAsync();
+    }
+
+    return Results.Ok(new { message = "Logged out successfully" });
+})
+.WithName("Logout");
 
 // GET /bills - Get all bills for the authenticated user
 app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
@@ -310,5 +357,45 @@ app.MapDelete("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal u
 
 app.Run();
 
-// Make Program accessible for integration tests
-public partial class Program { }
+// Helper methods - must be BEFORE the type declaration
+static string GenerateAccessToken(User user, IConfigurationSection jwtSettings, string secretKey)
+{
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+    var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    
+    var claims = new[]
+    {
+        new Claim(ClaimTypes.NameIdentifier, user.Id),
+        new Claim(ClaimTypes.Name, user.Username)
+    };
+
+    var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+        issuer: jwtSettings["Issuer"],
+        audience: jwtSettings["Audience"],
+        claims: claims,
+        expires: DateTime.UtcNow.AddMinutes(15),
+        signingCredentials: credentials
+    );
+
+    return new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
+}
+
+static async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, BillsDbContext db)
+{
+    var refreshToken = new RefreshToken
+    {
+        Id = Guid.NewGuid().ToString(),
+        Token = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64)),
+        UserId = userId,
+        ExpiresAt = DateTime.UtcNow.AddDays(7),
+        CreatedAt = DateTime.UtcNow,
+        IsRevoked = false
+    };
+
+    db.RefreshTokens.Add(refreshToken);
+    await db.SaveChangesAsync();
+
+    return refreshToken;
+}
+
+public partial class Program { }  // ← Type declaration MUST be last

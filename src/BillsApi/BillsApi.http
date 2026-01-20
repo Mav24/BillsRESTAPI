@@ -1,12 +1,12 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjM3YzY3M2FlLTMyYjctNDVhZC04MzU4LTgwMzQ0ZjEzZTdjNiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJNYXZlcmljayIsImV4cCI6MTc2ODUyMTQ0OSwiaXNzIjoiQmlsbHNBcGkiLCJhdWQiOiJCaWxsc0FwaVVzZXJzIn0.SX7XvNFeWDogzrGS5cTZDz8oKTRJkdh6iTNm56ZwEYc
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6ImY1NjBiYTc0LTIxYTMtNDJmZS04NWY4LWNlNTc4ZmE5ZmIyNyIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzY4ODcwNDg0LCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ.DaCnTbbG65z_C6zm4pHYXqnDvv3rB5PVvMuC7fIHiRA
 
 ### Register a new user
 POST {{BillsApi_HostAddress}}/auth/register
 Content-Type: application/json
 
 {
-  "username": "Maverick",
+  "username": "Jess",
   "password": "password123"
 }
 
@@ -15,7 +15,7 @@ POST {{BillsApi_HostAddress}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "testuser",
+  "username": "Mav",
   "password": "password123"
 }
 
@@ -35,7 +35,7 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "billName": "Jessica",
+  "billName": "Maverick",
   "amount": 150.00,
   "date": "2026-01-14T00:00:00",
   "amountOverMinimum": 20.00
@@ -56,4 +56,5 @@ Authorization: Bearer {{token}}
 ### Delete a bill (requires authentication)
 DELETE {{BillsApi_HostAddress}}/bills/7
 Authorization: Bearer {{token}}
+
 
