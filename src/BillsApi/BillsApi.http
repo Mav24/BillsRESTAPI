@@ -1,5 +1,6 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjVkOWFiMmQ2LTE3NmUtNDY4ZS04Y2VkLWEzZDc5MmUzZmQxMyIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJNYXYiLCJleHAiOjE3Njg4NzQ1NzIsImlzcyI6IkJpbGxzQXBpIiwiYXVkIjoiQmlsbHNBcGlVc2VycyJ9.pggAr-mVXOfuE0caulTmiLzH3qa1c2jDm5oczissY1g
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjU2M2JjMDJlLTQwMjgtNGEyNC04ZjI3LTg0M2YxNDgzMzMxZiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJNYXYiLCJleHAiOjE3NzA1NzUyOTEsImlzcyI6IkJpbGxzQXBpIiwiYXVkIjoiQmlsbHNBcGlVc2VycyJ9.d7cTzC6R21kxFBCgNxCb6AlQoIame40_n8aXo6CG4GI
+@refreshToken = C6rqUcpR3taRnxD6hscCFxKmO3Wuf/w4pzx5oCwpu/CWOqsl6B5nsiRNd7UYv8fwgSRoCnWZgdC1ZRZKx/NaYw==
 
 ### Register a new user
 POST {{BillsApi_HostAddress}}/auth/register
@@ -7,7 +8,8 @@ Content-Type: application/json
 
 {
   "username": "Mav",
-  "password": "password123"
+  "password": "Password123!",
+  "email": "maverick24@sfosquad.com"
 }
 
 ### Login to get JWT token
@@ -16,7 +18,7 @@ Content-Type: application/json
 
 {
   "username": "Mav",
-  "password": "password123"
+  "password": "Password123!"
 }
 
 ### Get all bills (requires authentication)
@@ -64,5 +66,33 @@ Content-Type: application/json
 {
   "refreshToken": "{{refreshToken}}"
 }
+
+
+### Forgot password (send reset email)
+POST {{BillsApi_HostAddress}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "maverick24@sfosquad.com"
+}
+
+
+### Reset password (use token from email)
+POST {{BillsApi_HostAddress}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "userId": "5d9ab2d6-176e-468e-8ced-a3d792e3fd13",
+  "token": "4w6P1jRY2ckzveDidDihzR+hxpQjn+IghSuNpAEVJeI=",
+  "newPassword": "NewPassword123!"
+}
+
+### Delete account and all associated bills (requires authentication)
+DELETE {{BillsApi_HostAddress}}/auth/account
+Authorization: Bearer {{token}}
+
+
+
+
 
 

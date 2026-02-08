@@ -16,6 +16,12 @@ public class User
     public required string Username { get; set; }
 
     /// <summary>
+    /// <summary>
+    /// The email address for the user (used for password reset and notifications).
+    /// </summary>
+    public required string Email { get; set; }
+
+    /// <summary>
     /// The hashed password.
     /// </summary>
     public required string PasswordHash { get; set; }

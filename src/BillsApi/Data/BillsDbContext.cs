@@ -26,6 +26,11 @@ public class BillsDbContext : DbContext
     /// The RefreshTokens table.
     /// </summary>
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    
+    /// <summary>
+    /// The PasswordResetTokens table.
+    /// </summary>
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +49,11 @@ public class BillsDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Username).IsRequired().HasMaxLength(100);
             entity.HasIndex(e => e.Username).IsUnique();
+
+            // Email mapping added for password reset and notifications
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.HasIndex(e => e.Email).IsUnique();
+
             entity.Property(e => e.PasswordHash).IsRequired();
         });
 
@@ -52,6 +62,19 @@ public class BillsDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Token).IsRequired().HasMaxLength(256);
             entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserId).IsRequired().HasMaxLength(450);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.ExpiresAt).IsRequired();
+            entity.Property(e => e.Used).HasDefaultValue(false);
             entity.HasOne(e => e.User)
                   .WithMany()
                   .HasForeignKey(e => e.UserId)

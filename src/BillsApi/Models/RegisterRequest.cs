@@ -14,4 +14,9 @@ public class RegisterRequest
     /// The password.
     /// </summary>
     public required string Password { get; set; }
+
+    /// <summary>
+    /// The email address.
+    /// </summary>
+    public required string Email { get; set; }
 }
