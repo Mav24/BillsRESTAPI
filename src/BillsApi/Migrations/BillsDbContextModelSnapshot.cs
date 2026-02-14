@@ -46,7 +46,7 @@ namespace BillsApi.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Bills");
+                    b.ToTable("Bills", (string)null);
                 });
 
             modelBuilder.Entity("BillsApi.Models.RefreshToken", b =>
@@ -79,7 +79,7 @@ namespace BillsApi.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("BillsApi.Models.User", b =>
@@ -101,7 +101,7 @@ namespace BillsApi.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("BillsApi.Models.RefreshToken", b =>

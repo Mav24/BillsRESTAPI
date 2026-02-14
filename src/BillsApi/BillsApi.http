@@ -40,7 +40,9 @@ Authorization: Bearer {{token}}
   "billName": "Maverick",
   "amount": 150.00,
   "date": "2026-01-14T00:00:00",
-  "amountOverMinimum": 20.00
+  "amountOverMinimum": 20.00,
+  "isPaid": false,
+  "paidDate": null
 }
 
 ### Update a bill (requires authentication)
@@ -52,7 +54,9 @@ Authorization: Bearer {{token}}
   "billName": "Update",
   "amount": 135.50,
   "date": "2024-01-15T00:00:00",
-  "amountOverMinimum": 30.50
+  "amountOverMinimum": 30.50,
+  "isPaid": true,
+  "paidDate": "2024-01-15T00:00:00"
 }
 
 ### Delete a bill (requires authentication)

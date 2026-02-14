@@ -414,7 +414,9 @@ app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal
         BillName = input.BillName.Trim(),
         Amount = input.Amount,
         Date = input.Date,
-        AmountOverMinimum = input.AmountOverMinimum
+        AmountOverMinimum = input.AmountOverMinimum,
+        IsPaid = input.IsPaid,
+        PaidDate = input.PaidDate
     };
 
     db.Bills.Add(bill);
@@ -459,6 +461,8 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
     bill.Amount = input.Amount;
     bill.Date = input.Date;
     bill.AmountOverMinimum = input.AmountOverMinimum;
+    bill.IsPaid = input.IsPaid;
+    bill.PaidDate = input.PaidDate;
 
     await db.SaveChangesAsync();
 

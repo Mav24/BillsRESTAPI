@@ -34,4 +34,15 @@ public class Bill
     /// Amount over the minimum threshold (user-entered value).
     /// </summary>
     public decimal AmountOverMinimum { get; set; }
+
+    /// <summary>
+    /// Indicates whether the bill has been paid.
+    /// </summary>
+    public bool IsPaid { get; set; }
+
+    /// <summary>
+    /// Date when the bill was paid (null if not paid).
+    /// </summary>
+    public DateTime? PaidDate { get; set; }
 }
+
