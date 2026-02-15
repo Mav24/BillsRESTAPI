@@ -3,6 +3,7 @@ using System;
 using BillsApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BillsApi.Migrations
 {
     [DbContext(typeof(BillsDbContext))]
-    partial class BillsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260214191651_AddHouseholdSupport")]
+    partial class AddHouseholdSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.1");
@@ -77,54 +80,6 @@ namespace BillsApi.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Households");
-                });
-
-            modelBuilder.Entity("BillsApi.Models.HouseholdInvitation", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("Accepted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime?>("AcceptedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("HouseholdId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("InvitedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email");
-
-                    b.HasIndex("HouseholdId");
-
-                    b.HasIndex("InvitedByUserId");
-
-                    b.ToTable("HouseholdInvitations");
                 });
 
             modelBuilder.Entity("BillsApi.Models.PasswordResetToken", b =>
@@ -233,25 +188,6 @@ namespace BillsApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Household");
-                });
-
-            modelBuilder.Entity("BillsApi.Models.HouseholdInvitation", b =>
-                {
-                    b.HasOne("BillsApi.Models.Household", "Household")
-                        .WithMany()
-                        .HasForeignKey("HouseholdId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BillsApi.Models.User", "InvitedByUser")
-                        .WithMany()
-                        .HasForeignKey("InvitedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Household");
-
-                    b.Navigation("InvitedByUser");
                 });
 
             modelBuilder.Entity("BillsApi.Models.PasswordResetToken", b =>

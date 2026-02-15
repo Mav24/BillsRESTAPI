@@ -342,6 +342,9 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
         return Results.NotFound(new { error = "User not found" });
     }
 
+    // Save household ID if user is in one (for cleanup check after deletion)
+    var householdId = userEntity.HouseholdId;
+
     // Delete all bills for this user
     var bills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
     db.Bills.RemoveRange(bills);
@@ -357,6 +360,21 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
     // Delete the user
     db.Users.Remove(userEntity);
 
+    // If user was in a household, check if it's now empty and delete if so
+    if (householdId is not null)
+    {
+        // Exclude the current user being deleted from the count
+        var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId && u.Id != userId);
+        if (remainingMembers == 0)
+        {
+            var household = await db.Households.FindAsync(householdId.Value);
+            if (household is not null)
+            {
+                db.Households.Remove(household);
+            }
+        }
+    }
+
     await db.SaveChangesAsync();
 
     return Results.Ok(new { message = "Account and all associated data deleted successfully" });
@@ -364,31 +382,72 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
 .RequireAuthorization()
 .WithName("DeleteAccount");
 
-// GET /bills - Get all bills for the authenticated user
+// GET /bills - Get all bills for the authenticated user OR their household
 app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
-    return await db.Bills.Where(b => b.UserId == userId).ToListAsync();
-})
-    .RequireAuthorization()
-    .WithName("GetAllBills");
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
-// GET /bills/{id} - Get single bill by ID (only if owned by user)
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    // If user is in a household, return all household bills
+    if (userEntity.HouseholdId is not null)
+    {
+        return Results.Ok(await db.Bills
+            .Where(b => b.HouseholdId == userEntity.HouseholdId)
+            .ToListAsync());
+    }
+
+    // Otherwise, return only their personal bills
+    return Results.Ok(await db.Bills.Where(b => b.UserId == userId).ToListAsync());
+})
+.RequireAuthorization()
+.WithName("GetAllBills");
+
+// GET /bills/{id} - Get single bill (must be owned by user OR in their household)
 app.MapGet("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
-    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    Bill? bill;
+
+    // If in household, can access any household bill
+    if (userEntity.HouseholdId is not null)
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+    }
+    else
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.UserId == userId);
+    }
+
     return bill is not null
         ? Results.Ok(bill)
         : Results.NotFound(new { error = "Bill not found" });
 })
-    .RequireAuthorization()
-    .WithName("GetBillById");
-
-// POST /bills - Create a new bill
+.RequireAuthorization()
+.WithName("GetBillById");
+// POST /bills - Create a new bill (associates with household if user is in one)
 app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
 
     // Input validation
     if (string.IsNullOrWhiteSpace(input.BillName))
@@ -411,6 +470,7 @@ app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal
     var bill = new Bill
     {
         UserId = userId,
+        HouseholdId = userEntity.HouseholdId, // Automatically associates with household
         BillName = input.BillName.Trim(),
         Amount = input.Amount,
         Date = input.Date,
@@ -426,11 +486,16 @@ app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal
 })
 .RequireAuthorization()
 .WithName("CreateBill");
-
-// PUT /bills/{id} - Update an existing bill (only if owned by user)
+// PUT /bills/{id} - Update bill (must be in same household or owned by user)
 app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
 
     // Input validation
     if (string.IsNullOrWhiteSpace(input.BillName))
@@ -450,7 +515,19 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
         return Results.BadRequest(new { error = "AmountOverMinimum cannot be negative" });
     }
 
-    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+    Bill? bill;
+
+    // If in household, can update any household bill
+    if (userEntity.HouseholdId is not null)
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+    }
+    else
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.UserId == userId);
+    }
 
     if (bill is null)
     {
@@ -470,12 +547,30 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
 })
 .RequireAuthorization()
 .WithName("UpdateBill");
-
-// DELETE /bills/{id} - Delete a bill (only if owned by user)
+// DELETE /bills/{id} - Delete bill (must be in same household or owned by user)
 app.MapDelete("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
-    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    Bill? bill;
+
+    // If in household, can delete any household bill
+    if (userEntity.HouseholdId is not null)
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+    }
+    else
+    {
+        bill = await db.Bills.FirstOrDefaultAsync(b => 
+            b.Id == id && b.UserId == userId);
+    }
 
     if (bill is null)
     {
@@ -489,6 +584,395 @@ app.MapDelete("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal u
 })
 .RequireAuthorization()
 .WithName("DeleteBill");
+
+// ============ HOUSEHOLD ENDPOINTS ============
+
+// GET /households/my-household - Get current user's household
+app.MapGet("/households/my-household", async (BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users
+        .Include(u => u.Household)
+        .ThenInclude(h => h!.Members)
+        .FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity?.Household is null)
+    {
+        return Results.Ok(new { household = (object?)null });
+    }
+
+    var householdDto = new
+    {
+        id = userEntity.Household.Id,
+        name = userEntity.Household.Name,
+        createdAt = userEntity.Household.CreatedAt,
+        members = userEntity.Household.Members.Select(m => new
+        {
+            id = m.Id,
+            username = m.Username,
+            email = m.Email
+        }).ToList()
+    };
+
+    return Results.Ok(new { household = householdDto });
+})
+.RequireAuthorization()
+.WithName("GetMyHousehold");
+
+// POST /households - Create new household
+app.MapPost("/households", async (CreateHouseholdRequest request, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest(new { error = "Household name is required" });
+    }
+
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users.FindAsync(userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    if (userEntity.HouseholdId is not null)
+    {
+        return Results.BadRequest(new { error = "You are already in a household. Leave your current household first." });
+    }
+
+    var household = new Household
+    {
+        Id = Guid.NewGuid(),
+        Name = request.Name.Trim(),
+        CreatedAt = DateTime.UtcNow
+    };
+
+    db.Households.Add(household);
+    userEntity.HouseholdId = household.Id;
+
+    // Migrate existing bills to household
+    var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
+    foreach (var bill in userBills)
+    {
+        bill.HouseholdId = household.Id;
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/households/my-household", new
+    {
+        id = household.Id,
+        name = household.Name,
+        createdAt = household.CreatedAt,
+        members = new[]
+        {
+            new { id = userEntity.Id, username = userEntity.Username, email = userEntity.Email }
+        }
+    });
+})
+.RequireAuthorization()
+.WithName("CreateHousehold");
+
+// POST /households/invite - Send invitation email to user
+app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext db, ClaimsPrincipal user, BillsApi.Services.IEmailSender emailSender, IConfiguration config, ILogger<Program> logger) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.BadRequest(new { error = "Email is required" });
+    }
+
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var currentUser = await db.Users
+        .Include(u => u.Household)
+        .FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (currentUser?.HouseholdId is null)
+    {
+        return Results.BadRequest(new { error = "You must be in a household to invite others" });
+    }
+
+    // Check if user exists
+    var invitedUser = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+    
+    if (invitedUser is null)
+    {
+        return Results.BadRequest(new { error = "No user found with that email. They must register first." });
+    }
+
+    if (invitedUser.HouseholdId is not null)
+    {
+        return Results.BadRequest(new { error = "That user is already in a household" });
+    }
+
+    // Check for existing pending invitation
+    var existingInvitation = await db.HouseholdInvitations
+        .FirstOrDefaultAsync(i => i.Email == request.Email && 
+                                  i.HouseholdId == currentUser.HouseholdId.Value && 
+                                  !i.Accepted && 
+                                  i.ExpiresAt > DateTime.UtcNow);
+    
+    if (existingInvitation is not null)
+    {
+        return Results.BadRequest(new { error = "An invitation has already been sent to this email" });
+    }
+
+    // Generate invitation token
+    var tokenBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+    var token = Convert.ToBase64String(tokenBytes);
+
+    using var sha = System.Security.Cryptography.SHA256.Create();
+    var tokenHash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token))).Replace("-", "").ToLowerInvariant();
+
+    var invitation = new HouseholdInvitation
+    {
+        Id = Guid.NewGuid().ToString(),
+        HouseholdId = currentUser.HouseholdId.Value,
+        Email = request.Email,
+        TokenHash = tokenHash,
+        InvitedByUserId = userId,
+        CreatedAt = DateTime.UtcNow,
+        ExpiresAt = DateTime.UtcNow.AddDays(7),
+        Accepted = false
+    };
+
+    db.HouseholdInvitations.Add(invitation);
+    await db.SaveChangesAsync();
+
+    // Send invitation email
+    var baseUrl = config["Auth:HouseholdInvitationBaseUrl"] ?? "https://bills.dukesducks.ca/billsapi";
+    var acceptUrl = $"{baseUrl}/household-invitation?token={Uri.EscapeDataString(token)}";
+
+    var html = $@"
+        <h2>You've been invited to join {currentUser.Household!.Name}!</h2>
+        <p>{currentUser.Username} has invited you to join their household on Bills Tracker.</p>
+        <p>By accepting, you'll be able to share and view bills together.</p>
+        <p><a href=""{acceptUrl}"" style=""display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;"">Accept Invitation</a></p>
+        <p>Or copy and paste this link: {acceptUrl}</p>
+        <p><em>This invitation expires in 7 days.</em></p>
+    ";
+
+    try
+    {
+        await emailSender.SendAsync(request.Email, $"Invitation to join {currentUser.Household.Name}", html);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to send household invitation email to {Email}", request.Email);
+        return Results.Problem("Failed to send invitation email");
+    }
+
+    return Results.Ok(new { message = $"Invitation sent to {request.Email}" });
+})
+.RequireAuthorization()
+.WithName("InviteToHousehold");
+
+// GET /household-invitation - Display invitation acceptance page
+app.MapGet("/household-invitation", async (HttpContext context, BillsDbContext db, string? token) =>
+{
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return Results.Content(GetInvitationErrorPage("Invalid invitation link"), "text/html");
+    }
+
+    // Hash the token to look up in database
+    using var sha = System.Security.Cryptography.SHA256.Create();
+    var tokenHash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token))).Replace("-", "").ToLowerInvariant();
+
+    var invitation = await db.HouseholdInvitations
+        .Include(i => i.Household)
+        .Include(i => i.InvitedByUser)
+        .FirstOrDefaultAsync(i => i.TokenHash == tokenHash);
+
+    if (invitation is null || invitation.ExpiresAt < DateTime.UtcNow || invitation.Accepted)
+    {
+        return Results.Content(GetInvitationErrorPage("This invitation is invalid or has expired"), "text/html");
+    }
+
+    return Results.Content(GetInvitationAcceptancePage(invitation.Household!.Name, invitation.InvitedByUser!.Username, token), "text/html");
+})
+.WithName("HouseholdInvitationPage");
+
+// POST /households/accept-invitation - Accept household invitation
+app.MapPost("/households/accept-invitation", async (AcceptInvitationRequest request, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Token))
+    {
+        return Results.BadRequest(new { error = "Token is required" });
+    }
+
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var currentUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (currentUser is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    if (currentUser.HouseholdId is not null)
+    {
+        return Results.BadRequest(new { error = "You are already in a household" });
+    }
+
+    // Hash token and find invitation
+    using var sha = System.Security.Cryptography.SHA256.Create();
+    var tokenHash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(request.Token))).Replace("-", "").ToLowerInvariant();
+
+    var invitation = await db.HouseholdInvitations
+        .Include(i => i.Household)
+        .FirstOrDefaultAsync(i => i.TokenHash == tokenHash && 
+                                  i.Email == currentUser.Email && 
+                                  !i.Accepted && 
+                                  i.ExpiresAt > DateTime.UtcNow);
+
+    if (invitation is null)
+    {
+        return Results.BadRequest(new { error = "Invalid or expired invitation" });
+    }
+
+    // Accept invitation - add user to household
+    currentUser.HouseholdId = invitation.HouseholdId;
+    invitation.Accepted = true;
+    invitation.AcceptedAt = DateTime.UtcNow;
+
+    // Migrate user's bills to household
+    var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
+    foreach (var bill in userBills)
+    {
+        bill.HouseholdId = invitation.HouseholdId;
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { 
+        message = "Successfully joined household!", 
+        householdName = invitation.Household!.Name 
+    });
+})
+.RequireAuthorization()
+.WithName("AcceptHouseholdInvitation");
+
+// POST /households/leave - Leave current household
+app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users
+        .Include(u => u.Household)
+        .ThenInclude(h => h!.Members)
+        .FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity?.HouseholdId is null)
+    {
+        return Results.BadRequest(new { error = "You are not in a household" });
+    }
+
+    var householdId = userEntity.HouseholdId.Value;
+    userEntity.HouseholdId = null;
+
+    // Keep their bills but remove household association
+    var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
+    foreach (var bill in userBills)
+    {
+        bill.HouseholdId = null;
+    }
+
+    // Check if household is now empty
+    var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId);
+    if (remainingMembers == 0)
+    {
+        var household = await db.Households.FindAsync(householdId);
+        if (household is not null)
+        {
+            db.Households.Remove(household);
+        }
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Left household successfully" });
+})
+.RequireAuthorization()
+.WithName("LeaveHousehold");
+
+// DELETE /households/members/{memberId} - Remove member from household
+app.MapDelete("/households/members/{memberId}", async (string memberId, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var currentUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (currentUser?.HouseholdId is null)
+    {
+        return Results.BadRequest(new { error = "You are not in a household" });
+    }
+
+    var memberToRemove = await db.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+    if (memberToRemove is null)
+    {
+        return Results.NotFound(new { error = "Member not found" });
+    }
+
+    if (memberToRemove.HouseholdId != currentUser.HouseholdId)
+    {
+        return Results.BadRequest(new { error = "That user is not in your household" });
+    }
+
+    memberToRemove.HouseholdId = null;
+
+    // Keep their bills but remove household association
+    var memberBills = await db.Bills.Where(b => b.UserId == memberId).ToListAsync();
+    foreach (var bill in memberBills)
+    {
+        bill.HouseholdId = null;
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Member removed from household successfully" });
+})
+.RequireAuthorization()
+.WithName("RemoveMember");
+
+// DELETE /households - Delete the entire household (creator only)
+app.MapDelete("/households", async (BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var currentUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (currentUser?.HouseholdId is null)
+    {
+        return Results.BadRequest(new { error = "You are not in a household" });
+    }
+
+    var household = await db.Households
+        .Include(h => h.Members)
+        .FirstOrDefaultAsync(h => h.Id == currentUser.HouseholdId);
+
+    if (household is null)
+    {
+        return Results.NotFound(new { error = "Household not found" });
+    }
+
+    // Remove household association from all members
+    foreach (var member in household.Members)
+    {
+        member.HouseholdId = null;
+    }
+
+    // Remove household association from all bills
+    var householdBills = await db.Bills.Where(b => b.HouseholdId == household.Id).ToListAsync();
+    foreach (var bill in householdBills)
+    {
+        bill.HouseholdId = null;
+    }
+
+    // Delete the household (invitations will cascade delete automatically)
+    db.Households.Remove(household);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Household deleted successfully. All members have been returned to personal mode." });
+})
+.RequireAuthorization()
+.WithName("DeleteHousehold");
 
 app.Run();
 
@@ -533,4 +1017,184 @@ static async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, BillsDb
     return refreshToken;
 }
 
+static string GetInvitationAcceptancePage(string householdName, string inviterUsername, string token)
+{
+    return $@"
+<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>Household Invitation</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 500px;
+            padding: 40px;
+            text-align: center;
+        }}
+        h1 {{
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }}
+        .household-name {{
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.2em;
+        }}
+        .accept-btn {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }}
+        .accept-btn:hover {{
+            transform: scale(1.05);
+        }}
+        .message {{
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }}
+        .success {{
+            background-color: #d4edda;
+            color: #155724;
+        }}
+        .error {{
+            background-color: #f8d7da;
+            color: #721c24;
+        }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h1>🏡 Household Invitation</h1>
+        <p>{inviterUsername} has invited you to join</p>
+        <p class=""household-name"">{householdName}</p>
+        <p>By accepting, you'll be able to share and view bills together.</p>
+        <button class=""accept-btn"" onclick=""acceptInvitation()"">Accept Invitation</button>
+        <div id=""message"" class=""message""></div>
+        <p style=""margin-top: 30px; font-size: 0.9em; color: #999;"">
+            Need to login? Please login in your Bills Tracker app first, then come back to this page.
+        </p>
+    </div>
+
+    <script>
+        async function acceptInvitation() {{
+            const btn = document.querySelector('.accept-btn');
+            const msgDiv = document.getElementById('message');
+            
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            
+            try {{
+                const response = await fetch('/households/accept-invitation', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json'
+                    }},
+                    body: JSON.stringify({{ token: '{token}' }})
+                }});
+                
+                const data = await response.json();
+                
+                if (response.ok) {{
+                    msgDiv.className = 'message success';
+                    msgDiv.style.display = 'block';
+                    msgDiv.textContent = '✓ ' + data.message + ' You can now close this page and return to the app.';
+                    btn.style.display = 'none';
+                }} else {{
+                    msgDiv.className = 'message error';
+                    msgDiv.style.display = 'block';
+                    msgDiv.textContent = '✗ ' + (data.error || 'Failed to accept invitation');
+                    btn.disabled = false;
+                    btn.textContent = 'Try Again';
+                }}
+            }} catch (error) {{
+                msgDiv.className = 'message error';
+                msgDiv.style.display = 'block';
+                msgDiv.textContent = '✗ Network error. Please make sure you\'re logged into the app.';
+                btn.disabled = false;
+                btn.textContent = 'Try Again';
+            }}
+        }}
+    </script>
+</body>
+</html>";
+}
+
+static string GetInvitationErrorPage(string errorMessage)
+{
+    return $@"
+<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>Invitation Error</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 500px;
+            padding: 40px;
+            text-align: center;
+        }}
+        h1 {{
+            color: #721c24;
+            margin-bottom: 20px;
+        }}
+        p {{
+            color: #666;
+            line-height: 1.6;
+        }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h1>⚠️ Invitation Error</h1>
+        <p>{errorMessage}</p>
+        <p>Please contact the person who sent you the invitation for a new link.</p>
+    </div>
+</body>
+</html>";
+}
+
 // End of program
+
+// Add these request record types at the bottom with other records
+record CreateHouseholdRequest(string Name);
+record InviteRequest(string Email);

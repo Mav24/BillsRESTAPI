@@ -16,6 +16,11 @@ public class Bill
     public required string UserId { get; set; }
 
     /// <summary>
+    /// The ID of the household this bill belongs to (nullable).
+    /// </summary>
+    public Guid? HouseholdId { get; set; }
+
+    /// <summary>
     /// Name/description of the bill (e.g., "Electricity", "Gas", "Water").
     /// </summary>
     public required string BillName { get; set; }
@@ -44,5 +49,11 @@ public class Bill
     /// Date when the bill was paid (null if not paid).
     /// </summary>
     public DateTime? PaidDate { get; set; }
+
+    /// <summary>
+    /// Navigation property for the household.
+    /// </summary>
+    public Household? Household { get; set; }
 }
+
 

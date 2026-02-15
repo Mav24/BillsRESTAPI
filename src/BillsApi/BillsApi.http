@@ -1,5 +1,5 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjU2M2JjMDJlLTQwMjgtNGEyNC04ZjI3LTg0M2YxNDgzMzMxZiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJNYXYiLCJleHAiOjE3NzA1NzUyOTEsImlzcyI6IkJpbGxzQXBpIiwiYXVkIjoiQmlsbHNBcGlVc2VycyJ9.d7cTzC6R21kxFBCgNxCb6AlQoIame40_n8aXo6CG4GI
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6ImUyZDcxNTM0LWU4YzEtNGVjYi04OGU3LTE5NWQ0OGI5OWFmMCIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzcxMTE1MzM4LCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ.LiV3XwQdYXBrrjNOY-PMT8SQI48PoPCAIxqoNB3IpMA
 @refreshToken = C6rqUcpR3taRnxD6hscCFxKmO3Wuf/w4pzx5oCwpu/CWOqsl6B5nsiRNd7UYv8fwgSRoCnWZgdC1ZRZKx/NaYw==
 
 ### Register a new user
@@ -8,8 +8,8 @@ Content-Type: application/json
 
 {
   "username": "Mav",
-  "password": "Password123!",
-  "email": "maverick24@sfosquad.com"
+  "password": "password123",
+  "email": "maerick24@sfosquad.com"
 }
 
 ### Login to get JWT token
@@ -17,8 +17,8 @@ POST {{BillsApi_HostAddress}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "Mav",
-  "password": "Password123!"
+  "username": "Jess",
+  "password": "password123"
 }
 
 ### Get all bills (requires authentication)
@@ -31,22 +31,22 @@ GET {{BillsApi_HostAddress}}/bills/2
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Create a new bill (requires authentication)
+### Create a new bill
 POST {{BillsApi_HostAddress}}/bills
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "billName": "Maverick",
+  "billName": "Jess Test bill",
   "amount": 150.00,
   "date": "2026-01-14T00:00:00",
-  "amountOverMinimum": 20.00,
+  "amountOverMinimum": 100.00,
   "isPaid": false,
   "paidDate": null
 }
 
 ### Update a bill (requires authentication)
-PUT {{BillsApi_HostAddress}}/bills/1
+PUT {{BillsApi_HostAddress}}/bills/20
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -93,6 +93,50 @@ Content-Type: application/json
 
 ### Delete account and all associated bills (requires authentication)
 DELETE {{BillsApi_HostAddress}}/auth/account
+Authorization: Bearer {{token}}
+
+### Get my household
+GET {{BillsApi_HostAddress}}/households/my-household
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create a household
+POST {{BillsApi_HostAddress}}/households
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Duke Family"
+}
+
+### Invite user to household by email
+POST {{BillsApi_HostAddress}}/households/invite
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "murrayduke@rogers.com"
+}
+
+### Accept household invitation (requires authentication)
+POST {{BillsApi_HostAddress}}/households/accept-invitation
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "token": "DFImnTxLWGAA8d7tyYOtWSHaa24D/XQCJj0Tj6BJ/34="
+}
+
+### Leave household
+POST {{BillsApi_HostAddress}}/households/leave
+Authorization: Bearer {{token}}
+
+### Delete household (removes all members and deletes the household)
+DELETE {{BillsApi_HostAddress}}/households
+Authorization: Bearer {{token}}
+
+### Remove member from household
+DELETE {{BillsApi_HostAddress}}/households/members/{memberId}
 Authorization: Bearer {{token}}
 
 

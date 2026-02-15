@@ -31,3 +31,34 @@ Content-Type: application/json
 GET {{BillsApi_HostAddress}}/bills
 Accept: application/json
 Authorization: Bearer {{accessToken}}
+
+### Get my household
+GET {{BillsApi_HostAddress}}/households/my-household
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create a household
+POST {{BillsApi_HostAddress}}/households
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Smith Family"
+}
+
+### Invite user to household by email
+POST {{BillsApi_HostAddress}}/households/invite
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "spouse@example.com"
+}
+
+### Leave household
+POST {{BillsApi_HostAddress}}/households/leave
+Authorization: Bearer {{token}}
+
+### Remove member from household
+DELETE {{BillsApi_HostAddress}}/households/members/{memberId}
+Authorization: Bearer {{token}}

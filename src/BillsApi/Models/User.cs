@@ -16,7 +16,6 @@ public class User
     public required string Username { get; set; }
 
     /// <summary>
-    /// <summary>
     /// The email address for the user (used for password reset and notifications).
     /// </summary>
     public required string Email { get; set; }
@@ -25,4 +24,14 @@ public class User
     /// The hashed password.
     /// </summary>
     public required string PasswordHash { get; set; }
+
+    /// <summary>
+    /// The ID of the household this user belongs to (nullable).
+    /// </summary>
+    public Guid? HouseholdId { get; set; }
+
+    /// <summary>
+    /// Navigation property for the household.
+    /// </summary>
+    public Household? Household { get; set; }
 }
