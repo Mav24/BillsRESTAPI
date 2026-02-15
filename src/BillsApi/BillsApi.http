@@ -1,5 +1,5 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6ImUyZDcxNTM0LWU4YzEtNGVjYi04OGU3LTE5NWQ0OGI5OWFmMCIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzcxMTE1MzM4LCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ.LiV3XwQdYXBrrjNOY-PMT8SQI48PoPCAIxqoNB3IpMA
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjFiOTBhNTQ0LTM2YzctNDM2Yy1hYjc3LWRjM2QzZTJhZmYyNiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzcxMTIxOTAwLCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ._Op2cMsdTTEFkWgdLmOflXVlyfnCqL3ct18K06fe3ig
 @refreshToken = C6rqUcpR3taRnxD6hscCFxKmO3Wuf/w4pzx5oCwpu/CWOqsl6B5nsiRNd7UYv8fwgSRoCnWZgdC1ZRZKx/NaYw==
 
 ### Register a new user
@@ -7,9 +7,9 @@ POST {{BillsApi_HostAddress}}/auth/register
 Content-Type: application/json
 
 {
-  "username": "Mav",
+  "username": "Jess",
   "password": "password123",
-  "email": "maerick24@sfosquad.com"
+  "email": "murrayduke@rogers.com"
 }
 
 ### Login to get JWT token

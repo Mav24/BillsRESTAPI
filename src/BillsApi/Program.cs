@@ -691,29 +691,29 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
         return Results.BadRequest(new { error = "You must be in a household to invite others" });
     }
 
-    // Check if user exists
-    var invitedUser = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-    
-    if (invitedUser is null)
+    // Check if user with this email exists in database
+    var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+    if (existingUser is null)
     {
-        return Results.BadRequest(new { error = "No user found with that email. They must register first." });
+        return Results.BadRequest(new { error = "No user found with that email. They must create an account first." });
     }
-
-    if (invitedUser.HouseholdId is not null)
+    
+    if (existingUser.HouseholdId is not null)
     {
         return Results.BadRequest(new { error = "That user is already in a household" });
     }
 
-    // Check for existing pending invitation
+    // Check for existing pending invitation and delete it (allow resending)
     var existingInvitation = await db.HouseholdInvitations
         .FirstOrDefaultAsync(i => i.Email == request.Email && 
                                   i.HouseholdId == currentUser.HouseholdId.Value && 
-                                  !i.Accepted && 
-                                  i.ExpiresAt > DateTime.UtcNow);
+                                  !i.Accepted);
     
     if (existingInvitation is not null)
     {
-        return Results.BadRequest(new { error = "An invitation has already been sent to this email" });
+        // Delete old invitation to allow resending
+        db.HouseholdInvitations.Remove(existingInvitation);
+        await db.SaveChangesAsync();
     }
 
     // Generate invitation token
@@ -788,7 +788,7 @@ app.MapGet("/household-invitation", async (HttpContext context, BillsDbContext d
         return Results.Content(GetInvitationErrorPage("This invitation is invalid or has expired"), "text/html");
     }
 
-    return Results.Content(GetInvitationAcceptancePage(invitation.Household!.Name, invitation.InvitedByUser!.Username, token), "text/html");
+    return Results.Content(GetInvitationAcceptancePage(invitation.Household!.Name, invitation.InvitedByUser!.Username, invitation.Email, token), "text/html");
 })
 .WithName("HouseholdInvitationPage");
 
@@ -1017,7 +1017,7 @@ static async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, BillsDb
     return refreshToken;
 }
 
-static string GetInvitationAcceptancePage(string householdName, string inviterUsername, string token)
+static string GetInvitationAcceptancePage(string householdName, string inviterUsername, string invitedEmail, string token)
 {
     return $@"
 <!DOCTYPE html>
@@ -1042,6 +1042,7 @@ static string GetInvitationAcceptancePage(string householdName, string inviterUs
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             max-width: 500px;
+            width: 100%;
             padding: 40px;
             text-align: center;
         }}
@@ -1049,34 +1050,70 @@ static string GetInvitationAcceptancePage(string householdName, string inviterUs
             color: #333;
             margin-bottom: 20px;
         }}
+        h2 {{
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }}
         p {{
             color: #666;
             line-height: 1.6;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }}
         .household-name {{
             font-weight: bold;
             color: #667eea;
             font-size: 1.2em;
         }}
-        .accept-btn {{
+        .form-container {{
+            text-align: left;
+        }}
+        .form-group {{
+            margin-bottom: 20px;
+        }}
+        label {{
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }}
+        input {{
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }}
+        input:focus {{
+            outline: none;
+            border-color: #667eea;
+        }}
+        .btn {{
+            width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 15px 40px;
+            padding: 15px;
             font-size: 16px;
             border-radius: 5px;
             cursor: pointer;
             transition: transform 0.2s;
+            margin-top: 10px;
         }}
-        .accept-btn:hover {{
-            transform: scale(1.05);
+        .btn:hover:not(:disabled) {{
+            transform: scale(1.02);
+        }}
+        .btn:disabled {{
+            opacity: 0.6;
+            cursor: not-allowed;
         }}
         .message {{
             margin-top: 20px;
             padding: 15px;
             border-radius: 5px;
             display: none;
+            text-align: center;
         }}
         .success {{
             background-color: #d4edda;
@@ -1086,58 +1123,167 @@ static string GetInvitationAcceptancePage(string householdName, string inviterUs
             background-color: #f8d7da;
             color: #721c24;
         }}
+        .app-links {{
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }}
+        .app-link {{
+            display: inline-block;
+            margin: 10px 5px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }}
+        .app-link:hover {{
+            background: #555;
+        }}
+        .intro-section {{
+            margin-bottom: 30px;
+        }}
+        .auth-section {{
+            display: block;
+        }}
+        .success-section {{
+            display: none;
+        }}
     </style>
 </head>
 <body>
     <div class=""container"">
-        <h1>🏡 Household Invitation</h1>
-        <p>{inviterUsername} has invited you to join</p>
-        <p class=""household-name"">{householdName}</p>
-        <p>By accepting, you'll be able to share and view bills together.</p>
-        <button class=""accept-btn"" onclick=""acceptInvitation()"">Accept Invitation</button>
+        <div class=""intro-section"">
+            <h1>🏡 Household Invitation</h1>
+            <p>{inviterUsername} has invited you to join</p>
+            <p class=""household-name"">{householdName}</p>
+            <p>By accepting, you'll be able to share and view bills together.</p>
+        </div>
+
+        <div class=""auth-section"" id=""authSection"">
+            <h2>Please sign in with {invitedEmail} to accept</h2>
+            
+            <!-- Login Form -->
+            <div class=""form-container active"">
+                <form onsubmit=""handleLogin(event)"">
+                    <div class=""form-group"">
+                        <label for=""loginUsername"">Username</label>
+                        <input type=""text"" id=""loginUsername"" required>
+                    </div>
+                    <div class=""form-group"">
+                        <label for=""loginPassword"">Password</label>
+                        <input type=""password"" id=""loginPassword"" required>
+                    </div>
+                    <button type=""submit"" class=""btn"" id=""loginBtn"">Sign In & Accept Invitation</button>
+                </form>
+                <p style=""margin-top: 20px; font-size: 0.9em; color: #999; text-align: center;"">
+                    Don't have an account? <a href=""/"" style=""color: #667eea;"">Create one first</a>, then come back to this link.
+                </p>
+            </div>
+        </div>
+
+        <div class=""success-section"" id=""successSection"">
+            <h2>✓ Success!</h2>
+            <p id=""successMessage"">You've successfully joined {householdName}!</p>
+            <p>Download the Bills Tracker app to manage your household bills:</p>
+            <div class=""app-links"">
+                <a href=""#"" class=""app-link"">📱 Download on App Store</a>
+                <a href=""#"" class=""app-link"">🤖 Get it on Google Play</a>
+            </div>
+            <p style=""margin-top: 20px; font-size: 0.9em; color: #999;"">
+                Already have the app? Open it now to see your household bills!
+            </p>
+        </div>
+
         <div id=""message"" class=""message""></div>
-        <p style=""margin-top: 30px; font-size: 0.9em; color: #999;"">
-            Need to login? Please login in your Bills Tracker app first, then come back to this page.
-        </p>
     </div>
 
     <script>
-        async function acceptInvitation() {{
-            const btn = document.querySelector('.accept-btn');
+        const invitationToken = '{token}';
+        let jwtToken = null;
+
+        function showMessage(message, isError = false) {{
             const msgDiv = document.getElementById('message');
-            
+            msgDiv.className = 'message ' + (isError ? 'error' : 'success');
+            msgDiv.style.display = 'block';
+            msgDiv.textContent = message;
+        }}
+
+        function hideMessage() {{
+            const msgDiv = document.getElementById('message');
+            msgDiv.style.display = 'none';
+        }}
+
+        function showSuccess(householdName) {{
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('successSection').style.display = 'block';
+        }}
+
+        async function handleLogin(event) {{
+            event.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
             btn.disabled = true;
-            btn.textContent = 'Processing...';
-            
+            btn.textContent = 'Signing in...';
+            hideMessage();
+
             try {{
-                const response = await fetch('/households/accept-invitation', {{
+                // Step 1: Login
+                const loginResponse = await fetch('./auth/login', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ username, password }})
+                }});
+
+                const loginData = await loginResponse.json();
+
+                if (!loginResponse.ok) {{
+                    showMessage('✗ ' + (loginData.error || 'Invalid username or password'), true);
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In & Accept Invitation';
+                    return;
+                }}
+
+                jwtToken = loginData.accessToken;
+
+                // Step 2: Accept invitation
+                await acceptInvitationWithToken();
+
+            }} catch (error) {{
+                showMessage('✗ Network error. Please try again.', true);
+                btn.disabled = false;
+                btn.textContent = 'Sign In & Accept Invitation';
+            }}
+        }}
+
+        async function acceptInvitationWithToken() {{
+            try {{
+                const response = await fetch('./households/accept-invitation', {{
                     method: 'POST',
                     headers: {{
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + jwtToken
                     }},
-                    body: JSON.stringify({{ token: '{token}' }})
+                    body: JSON.stringify({{ token: invitationToken }})
                 }});
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {{
-                    msgDiv.className = 'message success';
-                    msgDiv.style.display = 'block';
-                    msgDiv.textContent = '✓ ' + data.message + ' You can now close this page and return to the app.';
-                    btn.style.display = 'none';
+                    showSuccess(data.householdName || '{householdName}');
                 }} else {{
-                    msgDiv.className = 'message error';
-                    msgDiv.style.display = 'block';
-                    msgDiv.textContent = '✗ ' + (data.error || 'Failed to accept invitation');
-                    btn.disabled = false;
-                    btn.textContent = 'Try Again';
+                    showMessage('✗ ' + (data.error || 'Failed to accept invitation'), true);
+                    document.getElementById('loginBtn').disabled = false;
+                    document.getElementById('loginBtn').textContent = 'Sign In & Accept Invitation';
                 }}
             }} catch (error) {{
-                msgDiv.className = 'message error';
-                msgDiv.style.display = 'block';
-                msgDiv.textContent = '✗ Network error. Please make sure you\'re logged into the app.';
-                btn.disabled = false;
-                btn.textContent = 'Try Again';
+                showMessage('✗ Failed to accept invitation. Please try again.', true);
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('loginBtn').textContent = 'Sign In & Accept Invitation';
             }}
         }}
     </script>
