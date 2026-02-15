@@ -1,0 +1,57 @@
+@page
+@model HouseholdIndexModel
+@{
+    ViewData["Title"] = "Household";
+}
+
+<div class="page-header">
+    <h1>My Household</h1>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="alert alert-success">@Model.Message</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+@if (Model.Household != null)
+{
+    <div class="household-card">
+        <h2>@Model.Household.Name</h2>
+        
+        <h3>Members</h3>
+        <ul class="members-list">
+            @foreach (var member in Model.Household.Members)
+            {
+                <li>@member.Username</li>
+            }
+        </ul>
+
+        <div class="household-actions">
+            <h3>Invite Member</h3>
+            <form method="post" asp-page-handler="Invite">
+                <div class="form-group">
+                    <input type="email" name="email" placeholder="Enter email address" class="form-control" required />
+                </div>
+                <button type="submit" class="btn btn-primary">Send Invitation</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <p>You're not part of a household yet.</p>
+        <form method="post" asp-page-handler="Create">
+            <div class="form-group">
+                <label>Household Name</label>
+                <input type="text" name="name" placeholder="Enter household name" class="form-control" required />
+            </div>
+            <button type="submit" class="btn btn-primary">Create Household</button>
+        </form>
+    </div>
+}

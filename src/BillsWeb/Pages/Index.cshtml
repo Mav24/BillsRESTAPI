@@ -1,0 +1,41 @@
+@page
+@model IndexModel
+@using Microsoft.AspNetCore.Http
+@{
+    ViewData["Title"] = "Home";
+    var httpContext = ViewContext?.HttpContext;
+}
+
+<div class="hero">
+    <h1>Welcome to Bills Manager</h1>
+    <p class="lead">Manage your household bills and finances with ease</p>
+    
+    @if (httpContext == null || httpContext.Session.GetString("Token") == null)
+    {
+        <div class="cta-buttons">
+            <a asp-page="/Auth/Login" class="btn btn-primary">Login</a>
+            <a asp-page="/Auth/Register" class="btn btn-secondary">Get Started</a>
+        </div>
+    }
+    else
+    {
+        <div class="cta-buttons">
+            <a asp-page="/Bills/Index" class="btn btn-primary">View My Bills</a>
+        </div>
+    }
+</div>
+
+<div class="features">
+    <div class="feature">
+        <h3>?? Track Bills</h3>
+        <p>Keep track of all your bills in one place</p>
+    </div>
+    <div class="feature">
+        <h3>?? Household Management</h3>
+        <p>Share bills with your household members</p>
+    </div>
+    <div class="feature">
+        <h3>? Payment Tracking</h3>
+        <p>Mark bills as paid and track payment dates</p>
+    </div>
+</div>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Bills Manager</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="container">
+                <a class="navbar-brand" asp-page="/Index">Bills Manager</a>
+                @if (Context.Session.GetString("Token") != null)
+                {
+                    <div class="navbar-nav">
+                        <a class="nav-link" asp-page="/Bills/Index">My Bills</a>
+                        <a class="nav-link" asp-page="/Household/Index">Household</a>
+                        <a class="nav-link" asp-page="/Auth/Logout">Logout</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="navbar-nav">
+                        <a class="nav-link" asp-page="/Auth/Login">Login</a>
+                        <a class="nav-link" asp-page="/Auth/Register">Register</a>
+                    </div>
+                }
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer>
+        <div class="container">
+            &copy; 2025 - Bills Manager
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

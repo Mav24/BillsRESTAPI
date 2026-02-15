@@ -1,5 +1,5 @@
 @BillsApi_HostAddress = https://bills.dukesducks.ca/billsapi
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjFiOTBhNTQ0LTM2YzctNDM2Yy1hYjc3LWRjM2QzZTJhZmYyNiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzcxMTIxOTAwLCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ._Op2cMsdTTEFkWgdLmOflXVlyfnCqL3ct18K06fe3ig
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6ImM4YWVkMDRjLWFkNDgtNDBkMC1hMmY1LWRiZGI2NzFjYjhlMyIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJKZXNzIiwiZXhwIjoxNzcxMTc4NTY4LCJpc3MiOiJCaWxsc0FwaSIsImF1ZCI6IkJpbGxzQXBpVXNlcnMifQ.CpCLS92xHOnOFMI6xCQepIieYRtO-fUYye9X8Dw0ZZk
 @refreshToken = C6rqUcpR3taRnxD6hscCFxKmO3Wuf/w4pzx5oCwpu/CWOqsl6B5nsiRNd7UYv8fwgSRoCnWZgdC1ZRZKx/NaYw==
 
 ### Register a new user
@@ -18,7 +18,7 @@ Content-Type: application/json
 
 {
   "username": "Jess",
-  "password": "password123"
+  "password": "testtest"
 }
 
 ### Get all bills (requires authentication)
@@ -71,6 +71,15 @@ Content-Type: application/json
   "refreshToken": "{{refreshToken}}"
 }
 
+### Update email (requires authentication and current password)
+PATCH {{BillsApi_HostAddress}}/auth/email
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "murrayduke@rogers.com",
+  "currentPassword": "testtest"
+}
 
 ### Forgot password (send reset email)
 POST {{BillsApi_HostAddress}}/auth/forgot-password

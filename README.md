@@ -27,13 +27,28 @@ dotnet test
 
 ## API Endpoints
 
+### Authentication Endpoints
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/bills` | GET | Get all bills |
-| `/bills/{id}` | GET | Get a specific bill by ID |
-| `/bills` | POST | Create a new bill |
-| `/bills/{id}` | PUT | Update an existing bill |
-| `/bills/{id}` | DELETE | Delete a bill |
+| `/auth/register` | POST | Register a new user |
+| `/auth/login` | POST | Login and get JWT + Refresh token |
+| `/auth/refresh` | POST | Get new access token using refresh token |
+| `/auth/logout` | POST | Revoke refresh token |
+| `/auth/forgot-password` | POST | Send password reset email |
+| `/auth/reset-password` | POST | Reset password with token |
+| `/auth/email` | PATCH | Update user's email address (requires auth) |
+| `/auth/account` | DELETE | Delete user account and all associated data (requires auth) |
+
+### Bill Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/bills` | GET | Get all bills (requires auth) |
+| `/bills/{id}` | GET | Get a specific bill by ID (requires auth) |
+| `/bills` | POST | Create a new bill (requires auth) |
+| `/bills/{id}` | PUT | Update an existing bill (requires auth) |
+| `/bills/{id}` | DELETE | Delete a bill (requires auth) |
 
 ## Data Model
 
@@ -59,17 +74,75 @@ dotnet test
 
 ## Example Requests
 
-### Get All Bills
+### Authentication Examples
+
+#### Register a User
 
 ```bash
-curl http://localhost:5202/bills
+curl -X POST http://localhost:5202/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
+  }'
 ```
 
-### Create a Bill
+#### Login
+
+```bash
+curl -X POST http://localhost:5202/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "password": "password123"
+  }'
+```
+
+Response:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "abc123...",
+  "expiresIn": 900
+}
+```
+
+#### Update Email
+
+```bash
+curl -X PATCH http://localhost:5202/auth/email \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "email": "newemail@example.com",
+    "currentPassword": "password123"
+  }'
+```
+
+Response:
+```json
+{
+  "message": "Email updated successfully",
+  "email": "newemail@example.com"
+}
+```
+
+### Bill Examples
+
+#### Get All Bills
+
+```bash
+curl http://localhost:5202/bills \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### Create a Bill
 
 ```bash
 curl -X POST http://localhost:5202/bills \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
     "billName": "Electricity",
     "amount": 125.50,
@@ -78,17 +151,19 @@ curl -X POST http://localhost:5202/bills \
   }'
 ```
 
-### Get a Bill by ID
+#### Get a Bill by ID
 
 ```bash
-curl http://localhost:5202/bills/1
+curl http://localhost:5202/bills/1 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-### Update a Bill
+#### Update a Bill
 
 ```bash
 curl -X PUT http://localhost:5202/bills/1 \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
     "billName": "Electricity",
     "amount": 135.50,

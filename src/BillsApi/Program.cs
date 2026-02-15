@@ -331,6 +331,50 @@ app.MapPost("/auth/reset-password", async (ResetPasswordRequest request, BillsDb
 })
 .WithName("ResetPassword");
 
+// PATCH /auth/email - Update authenticated user's email address
+app.MapPatch("/auth/email", async (UpdateEmailRequest request, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var userEntity = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+    if (userEntity is null)
+    {
+        return Results.NotFound(new { error = "User not found" });
+    }
+
+    // Validate current password
+    if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+    {
+        return Results.BadRequest(new { error = "Current password is required" });
+    }
+
+    if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, userEntity.PasswordHash))
+    {
+        return Results.BadRequest(new { error = "Current password is incorrect" });
+    }
+
+    // Validate email
+    if (string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.BadRequest(new { error = "Email is required" });
+    }
+
+    // Check if email is already in use by another user
+    var emailExists = await db.Users.AnyAsync(u => u.Email == request.Email && u.Id != userId);
+    if (emailExists)
+    {
+        return Results.BadRequest(new { error = "Email already in use" });
+    }
+
+    // Update the email
+    userEntity.Email = request.Email.Trim();
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Email updated successfully", email = userEntity.Email });
+})
+.RequireAuthorization()
+.WithName("UpdateEmail");
+
 // DELETE /auth/account - Delete authenticated user account and all associated data
 app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =>
 {
