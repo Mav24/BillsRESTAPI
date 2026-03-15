@@ -50,6 +50,12 @@ public class EditBillModel : PageModel
             return Page();
         }
 
+        // If the user left My Share empty, default to the full amount (they owe nothing)
+        if (Input.AmountOverMinimum <= 0)
+        {
+            Input.AmountOverMinimum = Input.Amount;
+        }
+
         var success = await _apiClient.UpdateBillAsync(Input.Id, Input, token);
         
         if (!success)

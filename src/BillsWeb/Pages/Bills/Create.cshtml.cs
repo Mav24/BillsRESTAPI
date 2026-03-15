@@ -40,12 +40,15 @@ public class CreateBillModel : PageModel
             return LocalRedirect("/billsweb/auth/login");
         }
 
-        // Remove any validation errors for optional AmountOverMinimum field
-        ModelState.Remove("Input.AmountOverMinimum");
-        
         if (!ModelState.IsValid)
         {
             return Page();
+        }
+
+        // If the user left My Share empty, default to the full amount (they owe nothing)
+        if (Input.AmountOverMinimum <= 0)
+        {
+            Input.AmountOverMinimum = Input.Amount;
         }
 
         var result = await _apiClient.CreateBillAsync(Input, token);

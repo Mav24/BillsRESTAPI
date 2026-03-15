@@ -74,6 +74,66 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRouting();
 app.UseSession();
+
+// Middleware to recover session from backup cookies when in-memory session data is lost.
+// If the session Token is missing but a refresh token cookie exists, call the API to get
+// a fresh access token and restore the session so the user stays logged in.
+app.Use(async (context, next) =>
+{
+    if (string.IsNullOrEmpty(context.Session.GetString("Token"))
+        && context.Request.Cookies.TryGetValue("BillsWeb.RefreshToken", out var refreshToken)
+        && !string.IsNullOrEmpty(refreshToken))
+    {
+        try
+        {
+            var apiClient = context.RequestServices.GetRequiredService<IBillsApiClient>();
+            var result = await apiClient.RefreshTokenAsync(refreshToken);
+
+            if (result != null && !string.IsNullOrEmpty(result.AccessToken))
+            {
+                context.Session.SetString("Token", result.AccessToken);
+                context.Session.SetString("RefreshToken", result.RefreshToken);
+
+                if (context.Request.Cookies.TryGetValue("BillsWeb.Username", out var username)
+                    && !string.IsNullOrEmpty(username))
+                {
+                    context.Session.SetString("Username", username);
+                }
+
+                await context.Session.CommitAsync();
+
+                // Update backup cookies with the new tokens
+                var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/",
+                    Expires = DateTimeOffset.UtcNow.AddDays(7)
+                };
+                context.Response.Cookies.Append("BillsWeb.AuthToken", result.AccessToken, cookieOptions);
+                context.Response.Cookies.Append("BillsWeb.RefreshToken", result.RefreshToken, cookieOptions);
+            }
+            else
+            {
+                // Refresh failed — clear stale cookies so we don't retry on every request
+                context.Response.Cookies.Delete("BillsWeb.AuthToken");
+                context.Response.Cookies.Delete("BillsWeb.RefreshToken");
+                context.Response.Cookies.Delete("BillsWeb.Username");
+            }
+        }
+        catch
+        {
+            // Refresh failed — clear stale cookies
+            context.Response.Cookies.Delete("BillsWeb.AuthToken");
+            context.Response.Cookies.Delete("BillsWeb.RefreshToken");
+            context.Response.Cookies.Delete("BillsWeb.Username");
+        }
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 
 app.MapRazorPages();

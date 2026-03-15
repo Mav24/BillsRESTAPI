@@ -200,9 +200,29 @@ public class BillsApiClient : IBillsApiClient
     public async Task<bool> DeleteAccountAsync(string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         var response = await _httpClient.DeleteAsync("auth/account");
         return response.IsSuccessStatusCode;
+    }
+
+    public async Task<AuthResponse?> RefreshTokenAsync(string refreshToken)
+    {
+        try
+        {
+            var request = new { refreshToken };
+            var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("auth/refresh", content);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<AuthResponse>(json, _jsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 

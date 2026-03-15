@@ -34,8 +34,9 @@
         </div>
 
         <div class="form-group">
-            <label asp-for="Input.AmountOverMinimum"></label>
+            <label asp-for="Input.AmountOverMinimum">My Share</label>
             <input asp-for="Input.AmountOverMinimum" class="form-control" type="number" step="0.01" />
+            <small class="form-text text-muted">The portion you pay — the remainder is what they owe you</small>
             <span asp-validation-for="Input.AmountOverMinimum" class="text-danger"></span>
         </div>
 

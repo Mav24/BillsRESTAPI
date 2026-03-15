@@ -18,6 +18,7 @@ public interface IBillsApiClient
     Task<bool> LeaveHouseholdAsync(string token);
     Task<bool> UpdateEmailAsync(string email, string currentPassword, string token);
     Task<bool> DeleteAccountAsync(string token);
+    Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
 }
 
 public class AuthResponse

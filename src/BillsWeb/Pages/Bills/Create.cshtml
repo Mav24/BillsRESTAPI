@@ -32,9 +32,9 @@
         </div>
 
         <div class="form-group">
-            <label asp-for="Input.AmountOverMinimum">Amount Over Minimum (Optional)</label>
-            <input asp-for="Input.AmountOverMinimum" class="form-control" type="text" placeholder="Leave blank if not applicable" />
-            <small class="form-text text-muted">Enter a decimal amount or leave blank</small>
+            <label asp-for="Input.AmountOverMinimum">My Share (Optional)</label>
+            <input asp-for="Input.AmountOverMinimum" class="form-control" type="number" step="0.01" />
+            <small class="form-text text-muted">The portion you pay — the remainder is what they owe you</small>
         </div>
 
         <div class="form-actions">

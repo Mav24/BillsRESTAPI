@@ -81,7 +81,8 @@ public class LoginModel : PageModel
             }
 
             // Redirect directly to Bills Index page (use the app path so session cookie is sent)
-            // Also create a backup HttpOnly cookie with the access token so we can recover session if in-memory
+            // Store tokens and username in persistent HttpOnly cookies so the session can be
+            // recovered automatically when in-memory session data is lost (app restart, cache eviction).
             try
             {
                 var cookieOptions = new CookieOptions
@@ -89,9 +90,12 @@ public class LoginModel : PageModel
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.None,
-                    Path = "/"
+                    Path = "/",
+                    Expires = DateTimeOffset.UtcNow.AddDays(7)
                 };
                 HttpContext.Response.Cookies.Append("BillsWeb.AuthToken", result.AccessToken, cookieOptions);
+                HttpContext.Response.Cookies.Append("BillsWeb.RefreshToken", result.RefreshToken, cookieOptions);
+                HttpContext.Response.Cookies.Append("BillsWeb.Username", Input.Username, cookieOptions);
             }
             catch { /* best-effort, ignore on failure */ }
 

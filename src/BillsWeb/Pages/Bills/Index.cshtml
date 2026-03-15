@@ -19,8 +19,10 @@
     @foreach (var monthGroup in Model.BillsByMonth)
     {
         var monthBills = monthGroup.ToList();
-        var totalAmount = monthBills.Sum(b => b.Amount);
-        var paidAmount = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount);
+        var fullTotal = monthBills.Sum(b => b.Amount);
+        var myShareTotal = monthBills.Sum(b => b.AmountOverMinimum);
+        var theyOweTotal = fullTotal - myShareTotal;
+        var paidTheyOwe = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
         var unpaidCount = monthBills.Count(b => !b.IsPaid);
         
         <div class="month-section">
@@ -44,10 +46,16 @@
                 </div>
                 <div class="month-summary">
                     <span class="summary-item">
-                        <strong>Total:</strong> $@totalAmount.ToString("N2")
+                        <strong>Full Total:</strong> $@fullTotal.ToString("N2")
                     </span>
                     <span class="summary-item">
-                        <strong>Paid:</strong> $@paidAmount.ToString("N2")
+                        <strong>My Share:</strong> $@myShareTotal.ToString("N2")
+                    </span>
+                    <span class="summary-item">
+                        <strong>They Owe:</strong> $@theyOweTotal.ToString("N2")
+                    </span>
+                    <span class="summary-item">
+                        <strong>Paid:</strong> $@paidTheyOwe.ToString("N2")
                     </span>
                     @if (unpaidCount > 0)
                     {
@@ -74,11 +82,12 @@
                             }
                         </div>
                         <div class="bill-body">
-                            <p><strong>Amount:</strong> $@bill.Amount.ToString("N2")</p>
+                            <p><strong>Full Amount:</strong> $@bill.Amount.ToString("N2")</p>
                             <p><strong>Due Date:</strong> @bill.Date.ToString("MMM dd, yyyy")</p>
-                            @if (bill.AmountOverMinimum.HasValue)
+                            @if (bill.AmountOverMinimum > 0)
                             {
-                                <p><strong>Over Minimum:</strong> $@bill.AmountOverMinimum.Value.ToString("N2")</p>
+                                <p><strong>My Share:</strong> $@bill.AmountOverMinimum.ToString("N2")</p>
+                                <p><strong>They Owe:</strong> $@((bill.Amount - bill.AmountOverMinimum).ToString("N2"))</p>
                             }
                             @if (bill.IsPaid && bill.PaidDate.HasValue)
                             {

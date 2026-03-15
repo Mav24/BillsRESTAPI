@@ -16,7 +16,7 @@ public class BillViewModel
     [Required]
     public DateTime Date { get; set; } = DateTime.Now;
 
-    public decimal? AmountOverMinimum { get; set; }
+    public decimal AmountOverMinimum { get; set; }
 
     public bool IsPaid { get; set; }
 
