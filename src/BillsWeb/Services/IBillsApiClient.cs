@@ -10,11 +10,14 @@ public interface IBillsApiClient
     Task<BillViewModel?> GetBillAsync(int id, string token);
     Task<BillViewModel?> CreateBillAsync(BillViewModel bill, string token);
     Task<bool> UpdateBillAsync(int id, BillViewModel bill, string token);
+    Task<bool> ToggleBillPaidAsync(int id, bool isPaid, string token);
     Task<bool> DeleteBillAsync(int id, string token);
     Task<HouseholdViewModel?> GetMyHouseholdAsync(string token);
     Task<bool> CreateHouseholdAsync(string name, string token);
     Task<bool> InviteToHouseholdAsync(string email, string token);
+    Task<bool> LeaveHouseholdAsync(string token);
     Task<bool> UpdateEmailAsync(string email, string currentPassword, string token);
+    Task<bool> DeleteAccountAsync(string token);
 }
 
 public class AuthResponse

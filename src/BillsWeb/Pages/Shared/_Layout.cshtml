@@ -16,6 +16,7 @@
                     <div class="navbar-nav">
                         <a class="nav-link" asp-page="/Bills/Index">My Bills</a>
                         <a class="nav-link" asp-page="/Household/Index">Household</a>
+                        <a class="nav-link" asp-page="/Account/Settings">Account</a>
                         <a class="nav-link" asp-page="/Auth/Logout">Logout</a>
                     </div>
                 }
@@ -37,7 +38,11 @@
 
     <footer>
         <div class="container">
-            &copy; 2025 - Bills Manager
+            <span>&copy; 2025 - Bills Manager</span>
+            <nav class="footer-nav">
+                <a asp-page="/About">About</a>
+                <a asp-page="/Privacy">Terms &amp; Conditions</a>
+            </nav>
         </div>
     </footer>
 

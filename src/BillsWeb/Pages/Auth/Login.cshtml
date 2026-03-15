@@ -4,6 +4,23 @@
     ViewData["Title"] = "Login";
 }
 
+@if (Model.LoginSuccess)
+{
+    <meta http-equiv="refresh" content="3; url=/billsweb/bills/index">
+    <div class="alert alert-success" style="margin: 20px; padding: 20px; text-align: center;">
+        <h3>? Login Successful!</h3>
+        <p>Welcome back! Redirecting to your bills in 3 seconds...</p>
+        <p>If you are not redirected, <a href="/billsweb/bills/index">click here</a>.</p>
+        <p><small>Session ID: @Model.HttpContext.Session.Id</small></p>
+    </div>
+    <script>
+        console.log('Login success page loaded');
+        console.log('All cookies:', document.cookie);
+        console.log('Redirecting in 3 seconds to /billsweb/bills/index');
+    </script>
+}
+else
+{
 <div class="auth-container">
     <div class="auth-card">
         <h2>Login</h2>
@@ -34,6 +51,7 @@
         </div>
     </div>
 </div>
+}
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

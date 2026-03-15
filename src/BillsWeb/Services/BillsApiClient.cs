@@ -116,6 +116,23 @@ public class BillsApiClient : IBillsApiClient
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<bool> ToggleBillPaidAsync(int id, bool isPaid, string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        
+        // First get the bill to preserve other fields
+        var bill = await GetBillAsync(id, token);
+        if (bill == null)
+            return false;
+        
+        // Update only paid status and paid date
+        bill.IsPaid = isPaid;
+        bill.PaidDate = isPaid ? DateTime.Now : null;
+        
+        // Use the existing PUT endpoint to update the bill
+        return await UpdateBillAsync(id, bill, token);
+    }
+
     public async Task<bool> DeleteBillAsync(int id, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -133,7 +150,10 @@ public class BillsApiClient : IBillsApiClient
             return null;
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<HouseholdViewModel>(json, _jsonOptions);
+        
+        // API returns { "household": { ... } }, so we need to deserialize the wrapper first
+        var wrapper = JsonSerializer.Deserialize<HouseholdResponseWrapper>(json, _jsonOptions);
+        return wrapper?.Household;
     }
 
     public async Task<bool> CreateHouseholdAsync(string name, string token)
@@ -158,6 +178,14 @@ public class BillsApiClient : IBillsApiClient
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<bool> LeaveHouseholdAsync(string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        
+        var response = await _httpClient.PostAsync("households/leave", null);
+        return response.IsSuccessStatusCode;
+    }
+
     public async Task<bool> UpdateEmailAsync(string email, string currentPassword, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -168,4 +196,19 @@ public class BillsApiClient : IBillsApiClient
         
         return response.IsSuccessStatusCode;
     }
+
+    public async Task<bool> DeleteAccountAsync(string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        
+        var response = await _httpClient.DeleteAsync("auth/account");
+        return response.IsSuccessStatusCode;
+    }
 }
+
+// Helper class to deserialize the household response wrapper
+internal class HouseholdResponseWrapper
+{
+    public HouseholdViewModel? Household { get; set; }
+}
+

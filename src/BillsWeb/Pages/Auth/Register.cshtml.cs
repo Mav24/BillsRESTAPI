@@ -13,39 +13,45 @@ public class RegisterModel : PageModel
     public RegisterViewModel Input { get; set; } = new();
 
     public string? ErrorMessage { get; set; }
+    
+    public bool RegistrationSuccess { get; set; } = false;
 
     public RegisterModel(IBillsApiClient apiClient)
     {
         _apiClient = apiClient;
     }
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
         if (HttpContext.Session.GetString("Token") != null)
         {
-            Response.Redirect("/Bills");
+            return LocalRedirect("/billsweb/bills/index");
         }
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
+        System.Diagnostics.Debug.WriteLine("=== Register OnPostAsync Started ===");
+        
         if (!ModelState.IsValid)
         {
+            System.Diagnostics.Debug.WriteLine("ModelState Invalid");
             return Page();
         }
 
-        var result = await _apiClient.RegisterAsync(Input.Username, Input.Email, Input.Password);
-        
-        if (result == null)
+        System.Diagnostics.Debug.WriteLine($"Attempting registration for user: {Input.Username}");
+        var registerResult = await _apiClient.RegisterAsync(Input.Username, Input.Email, Input.Password);
+
+        if (registerResult == null)
         {
             ErrorMessage = "Registration failed. Username or email may already be in use.";
+            System.Diagnostics.Debug.WriteLine("Registration failed - API returned null");
             return Page();
         }
-
-        HttpContext.Session.SetString("Token", result.AccessToken);
-        HttpContext.Session.SetString("RefreshToken", result.RefreshToken);
-        HttpContext.Session.SetString("Username", Input.Username);
-
-        return RedirectToPage("/Bills/Index");
+        // Registration succeeded — redirect user to login page. Automatic login caused issues in some hosts.
+        System.Diagnostics.Debug.WriteLine("Registration succeeded - redirecting user to login page");
+        return LocalRedirect("/billsweb/auth/login");
     }
 }

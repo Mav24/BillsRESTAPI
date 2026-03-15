@@ -23,7 +23,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         Household = await _apiClient.GetMyHouseholdAsync(token);
@@ -35,7 +35,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         var success = await _apiClient.CreateHouseholdAsync(name, token);
@@ -57,7 +57,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         var success = await _apiClient.InviteToHouseholdAsync(email, token);
@@ -69,6 +69,28 @@ public class HouseholdIndexModel : PageModel
         else
         {
             ErrorMessage = "Failed to send invitation";
+        }
+
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostLeaveAsync()
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrEmpty(token))
+        {
+            return LocalRedirect("/billsweb/auth/login");
+        }
+
+        var success = await _apiClient.LeaveHouseholdAsync(token);
+        
+        if (success)
+        {
+            Message = "You have successfully left the household";
+        }
+        else
+        {
+            ErrorMessage = "Failed to leave household";
         }
 
         return RedirectToPage();

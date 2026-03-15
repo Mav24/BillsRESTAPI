@@ -1,0 +1,42 @@
+@page
+@model AboutModel
+@{
+    ViewData["Title"] = "About";
+}
+
+<div class="about-page">
+    <h1>About Bills Manager</h1>
+    <p class="lead">Bills Manager is a simple, free tool designed to help you stay on top of your household bills and finances.</p>
+
+    <section>
+        <h2>What We Do</h2>
+        <p>Managing monthly bills can be stressful. Bills Manager gives you a single place to track every recurring bill, share responsibilities with household members, and mark payments as they're made&mdash;so nothing slips through the cracks.</p>
+    </section>
+
+    <section>
+        <h2>Key Features</h2>
+        <ul>
+            <li><strong>Bill Tracking</strong> &ndash; Keep all your bills organised in one place with due dates, amounts, and categories.</li>
+            <li><strong>Household Management</strong> &ndash; Invite household members so everyone can view and manage shared bills.</li>
+            <li><strong>Payment Tracking</strong> &ndash; Mark bills as paid and maintain a clear history of payment dates.</li>
+            <li><strong>Cross-Platform</strong> &ndash; Access your bills from any device through the web or the companion mobile app.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Contact</h2>
+        <p>Have questions, feedback, or suggestions? Reach out at <span id="contact-email">[javascript required]</span>.</p>
+    </section>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var u = 'maverick24';
+            var d = 'sfosquad.com';
+            var el = document.getElementById('contact-email');
+            var addr = u + '@@' + d;
+            el.innerHTML = '<a href="mailto:' + addr + '">' + addr + '</a>';
+        })();
+    </script>
+}

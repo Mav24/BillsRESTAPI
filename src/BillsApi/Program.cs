@@ -142,7 +142,7 @@ app.MapHealthChecks("/health");
 // }
 
 // POST /auth/register - Register a new user
-app.MapPost("/auth/register", async (RegisterRequest request, BillsDbContext db) =>
+app.MapPost("/auth/register", async (RegisterRequest request, BillsDbContext db, IConfiguration config) =>
 {
     if (string.IsNullOrWhiteSpace(request.Username) || request.Username.Length < 3)
     {
@@ -180,7 +180,13 @@ app.MapPost("/auth/register", async (RegisterRequest request, BillsDbContext db)
     db.Users.Add(user);
     await db.SaveChangesAsync();
 
-    return Results.Ok(new { message = "User registered successfully" });
+    // Generate tokens so the client can sign in immediately
+    var jwtSettingsLocal = config.GetSection("Jwt");
+    var secretKeyLocal = jwtSettingsLocal["SecretKey"]!;
+    var accessToken = GenerateAccessToken(user, jwtSettingsLocal, secretKeyLocal);
+    var refreshToken = await GenerateRefreshTokenAsync(user.Id, db);
+
+    return Results.Ok(new { accessToken, refreshToken = refreshToken.Token, expiresIn = 900 });
 })
 .WithName("Register");
 
@@ -401,6 +407,14 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
     var resetTokens = await db.PasswordResetTokens.Where(rt => rt.UserId == userId).ToListAsync();
     db.PasswordResetTokens.RemoveRange(resetTokens);
 
+    // Delete all household invitations sent by this user
+    var invitationsSent = await db.HouseholdInvitations.Where(hi => hi.InvitedByUserId == userId).ToListAsync();
+    db.HouseholdInvitations.RemoveRange(invitationsSent);
+
+    // Delete all household invitations sent to this user's email
+    var invitationsReceived = await db.HouseholdInvitations.Where(hi => hi.Email == userEntity.Email).ToListAsync();
+    db.HouseholdInvitations.RemoveRange(invitationsReceived);
+
     // Delete the user
     db.Users.Remove(userEntity);
 
@@ -414,6 +428,10 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
             var household = await db.Households.FindAsync(householdId.Value);
             if (household is not null)
             {
+                // Delete all invitations to this household as well
+                var householdInvitations = await db.HouseholdInvitations.Where(hi => hi.HouseholdId == householdId.Value).ToListAsync();
+                db.HouseholdInvitations.RemoveRange(householdInvitations);
+                
                 db.Households.Remove(household);
             }
         }

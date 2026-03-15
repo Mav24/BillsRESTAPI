@@ -22,14 +22,24 @@
 {
     <div class="household-card">
         <h2>@Model.Household.Name</h2>
+        <p><small>Created: @Model.Household.CreatedAt.ToString("MMMM dd, yyyy")</small></p>
         
         <h3>Members</h3>
-        <ul class="members-list">
-            @foreach (var member in Model.Household.Members)
-            {
-                <li>@member.Username</li>
-            }
-        </ul>
+        @if (Model.Household.Members.Any())
+        {
+            <ul class="members-list">
+                @foreach (var member in Model.Household.Members)
+                {
+                    <li>
+                        <strong>@member.Username</strong> - @member.Email
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No members in this household yet.</p>
+        }
 
         <div class="household-actions">
             <h3>Invite Member</h3>
@@ -38,6 +48,14 @@
                     <input type="email" name="email" placeholder="Enter email address" class="form-control" required />
                 </div>
                 <button type="submit" class="btn btn-primary">Send Invitation</button>
+            </form>
+        </div>
+
+        <div class="household-leave">
+            <h3>Leave Household</h3>
+            <p class="text-muted">If you leave this household, you will no longer have access to shared bills and information.</p>
+            <form method="post" asp-page-handler="Leave">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to leave this household? This action cannot be undone.')">Leave Household</button>
             </form>
         </div>
     </div>

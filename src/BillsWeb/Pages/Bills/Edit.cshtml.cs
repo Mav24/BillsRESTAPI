@@ -24,7 +24,7 @@ public class EditBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         var bill = await _apiClient.GetBillAsync(id, token);
@@ -42,7 +42,7 @@ public class EditBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         if (!ModelState.IsValid)
@@ -58,6 +58,6 @@ public class EditBillModel : PageModel
             return Page();
         }
 
-        return RedirectToPage("/Bills/Index");
+        return LocalRedirect("/billsweb/bills/index");
     }
 }

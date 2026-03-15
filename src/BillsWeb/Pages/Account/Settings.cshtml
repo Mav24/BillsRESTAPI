@@ -1,0 +1,94 @@
+@page
+@model BillsWeb.Pages.Account.SettingsModel
+@{
+    ViewData["Title"] = "Account Settings";
+}
+
+<div class="settings-container">
+    <h1>Account Settings</h1>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-error">
+            @Model.ErrorMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success">
+            @Model.SuccessMessage
+        </div>
+    }
+
+    <div class="settings-section">
+        <h2>Danger Zone</h2>
+        <div class="danger-zone">
+            <div class="danger-zone-content">
+                <h3>Delete Account</h3>
+                <p>Permanently delete your account and all associated data including:</p>
+                <ul>
+                    <li>All your bills</li>
+                    <li>Your household (if you're the last member)</li>
+                    <li>All authentication tokens</li>
+                    <li>All personal information</li>
+                </ul>
+                <p class="warning-text">
+                    <strong>Warning:</strong> This action cannot be undone. All your data will be permanently deleted.
+                </p>
+            </div>
+            <div class="danger-zone-actions">
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    Delete My Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-actions">
+        <a asp-page="/Index" class="btn btn-secondary">Back to Home</a>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <h2>Confirm Account Deletion</h2>
+        <p>Are you absolutely sure you want to delete your account?</p>
+        <p class="warning-text">This will permanently delete:</p>
+        <ul>
+            <li>Your account and profile</li>
+            <li>All your bills</li>
+            <li>Your household membership</li>
+            <li>All associated data</li>
+        </ul>
+        <p class="warning-text"><strong>This action cannot be undone!</strong></p>
+        
+        <form method="post" asp-page-handler="DeleteAccount">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">Yes, Delete My Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function confirmDelete() {
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('deleteModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+}

@@ -32,19 +32,9 @@
         </div>
 
         <div class="form-group">
-            <label asp-for="Input.AmountOverMinimum"></label>
-            <input asp-for="Input.AmountOverMinimum" class="form-control" type="number" step="0.01" />
-            <span asp-validation-for="Input.AmountOverMinimum" class="text-danger"></span>
-        </div>
-
-        <div class="form-check">
-            <input asp-for="Input.IsPaid" class="form-check-input" type="checkbox" />
-            <label asp-for="Input.IsPaid" class="form-check-label"></label>
-        </div>
-
-        <div class="form-group" id="paidDateGroup" style="display: none;">
-            <label asp-for="Input.PaidDate"></label>
-            <input asp-for="Input.PaidDate" class="form-control" type="date" />
+            <label asp-for="Input.AmountOverMinimum">Amount Over Minimum (Optional)</label>
+            <input asp-for="Input.AmountOverMinimum" class="form-control" type="text" placeholder="Leave blank if not applicable" />
+            <small class="form-text text-muted">Enter a decimal amount or leave blank</small>
         </div>
 
         <div class="form-actions">
@@ -56,9 +46,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script>
-        document.getElementById('Input_IsPaid').addEventListener('change', function() {
-            document.getElementById('paidDateGroup').style.display = this.checked ? 'block' : 'none';
-        });
-    </script>
 }

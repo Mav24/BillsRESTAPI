@@ -24,10 +24,11 @@ public class CreateBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
         Input.Date = DateTime.Now;
+        Input.IsPaid = false; // New bills are never paid on creation
         return Page();
     }
 
@@ -36,9 +37,12 @@ public class CreateBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return RedirectToPage("/Auth/Login");
+            return LocalRedirect("/billsweb/auth/login");
         }
 
+        // Remove any validation errors for optional AmountOverMinimum field
+        ModelState.Remove("Input.AmountOverMinimum");
+        
         if (!ModelState.IsValid)
         {
             return Page();
@@ -52,6 +56,6 @@ public class CreateBillModel : PageModel
             return Page();
         }
 
-        return RedirectToPage("/Bills/Index");
+        return LocalRedirect("/billsweb/bills/index");
     }
 }
