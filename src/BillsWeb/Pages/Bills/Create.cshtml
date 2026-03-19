@@ -32,9 +32,9 @@
         </div>
 
         <div class="form-group">
-            <label asp-for="Input.AmountOverMinimum">My Share (Optional)</label>
-            <input asp-for="Input.AmountOverMinimum" class="form-control" type="number" step="0.01" />
-            <small class="form-text text-muted">The portion you pay — the remainder is what they owe you</small>
+            <label for="TheyOwe">What They Owe (Optional)</label>
+            <input asp-for="TheyOwe" class="form-control" type="number" step="0.01" />
+            <small class="form-text text-muted">The portion they owe you — leave empty if you pay the full amount</small>
         </div>
 
         <div class="form-actions">

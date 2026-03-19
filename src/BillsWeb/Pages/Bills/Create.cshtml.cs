@@ -12,6 +12,9 @@ public class CreateBillModel : PageModel
     [BindProperty]
     public BillViewModel Input { get; set; } = new();
 
+    [BindProperty]
+    public decimal? TheyOwe { get; set; }
+
     public string? ErrorMessage { get; set; }
 
     public CreateBillModel(IBillsApiClient apiClient)
@@ -45,11 +48,8 @@ public class CreateBillModel : PageModel
             return Page();
         }
 
-        // If the user left My Share empty, default to the full amount (they owe nothing)
-        if (Input.AmountOverMinimum <= 0)
-        {
-            Input.AmountOverMinimum = Input.Amount;
-        }
+        // AmountOverMinimum stores what they owe; default to 0 (you pay the full amount)
+        Input.AmountOverMinimum = TheyOwe ?? 0;
 
         var result = await _apiClient.CreateBillAsync(Input, token);
         

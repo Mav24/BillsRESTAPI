@@ -20,9 +20,9 @@
     {
         var monthBills = monthGroup.ToList();
         var fullTotal = monthBills.Sum(b => b.Amount);
-        var myShareTotal = monthBills.Sum(b => b.AmountOverMinimum);
-        var theyOweTotal = fullTotal - myShareTotal;
-        var paidTheyOwe = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
+        var theyOweTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.AmountOverMinimum);
+        var myShareTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
+        var paidTotal = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount);
         var unpaidCount = monthBills.Count(b => !b.IsPaid);
         
         <div class="month-section">
@@ -55,7 +55,7 @@
                         <strong>They Owe:</strong> $@theyOweTotal.ToString("N2")
                     </span>
                     <span class="summary-item">
-                        <strong>Paid:</strong> $@paidTheyOwe.ToString("N2")
+                        <strong>Paid:</strong> $@paidTotal.ToString("N2")
                     </span>
                     @if (unpaidCount > 0)
                     {
@@ -86,8 +86,8 @@
                             <p><strong>Due Date:</strong> @bill.Date.ToString("MMM dd, yyyy")</p>
                             @if (bill.AmountOverMinimum > 0)
                             {
-                                <p><strong>My Share:</strong> $@bill.AmountOverMinimum.ToString("N2")</p>
-                                <p><strong>They Owe:</strong> $@((bill.Amount - bill.AmountOverMinimum).ToString("N2"))</p>
+                                <p><strong>My Share:</strong> $@((bill.Amount - bill.AmountOverMinimum).ToString("N2"))</p>
+                                <p><strong>They Owe:</strong> $@bill.AmountOverMinimum.ToString("N2")</p>
                             }
                             @if (bill.IsPaid && bill.PaidDate.HasValue)
                             {
