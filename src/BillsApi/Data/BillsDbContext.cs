@@ -42,6 +42,11 @@ public class BillsDbContext : DbContext
     /// </summary>
     public DbSet<HouseholdInvitation> HouseholdInvitations => Set<HouseholdInvitation>();
 
+    /// <summary>
+    /// The BillShares table.
+    /// </summary>
+    public DbSet<BillShare> BillShares => Set<BillShare>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Bill>(entity =>
@@ -109,6 +114,31 @@ public class BillsDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<BillShare>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.BillId, e.SharedWithUserId }).IsUnique();
+            entity.HasIndex(e => e.SharedWithUserId);
+            entity.Property(e => e.SharedByUserId).IsRequired().HasMaxLength(450);
+            entity.Property(e => e.SharedWithUserId).IsRequired().HasMaxLength(450);
+            entity.Property(e => e.SharedAt).IsRequired();
+
+            entity.HasOne(e => e.Bill)
+                  .WithMany(b => b.Shares)
+                  .HasForeignKey(e => e.BillId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.SharedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.SharedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.SharedWithUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.SharedWithUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
         modelBuilder.Entity<HouseholdInvitation>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -118,6 +148,7 @@ public class BillsDbContext : DbContext
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
             entity.Property(e => e.Accepted).HasDefaultValue(false);
+            entity.Property(e => e.ShareInviterBills).HasDefaultValue(false);
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.HouseholdId);
             

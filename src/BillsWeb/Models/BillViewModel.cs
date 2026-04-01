@@ -21,4 +21,20 @@ public class BillViewModel
     public bool IsPaid { get; set; }
 
     public DateTime? PaidDate { get; set; }
+
+    public Guid? HouseholdId { get; set; }
+
+    public string? SharedBy { get; set; }
+
+    public bool IsShared { get; set; }
+
+    public string? ShareWith { get; set; }
+}
+
+public class BillShareViewModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime SharedAt { get; set; }
 }

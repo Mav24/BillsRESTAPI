@@ -10,7 +10,11 @@ public class HouseholdIndexModel : PageModel
     private readonly IBillsApiClient _apiClient;
 
     public HouseholdViewModel? Household { get; set; }
+
+    [TempData]
     public string? Message { get; set; }
+
+    [TempData]
     public string? ErrorMessage { get; set; }
 
     public HouseholdIndexModel(IBillsApiClient apiClient)
@@ -52,7 +56,7 @@ public class HouseholdIndexModel : PageModel
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostInviteAsync(string email)
+    public async Task<IActionResult> OnPostInviteAsync(string email, bool shareExistingBills)
     {
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
@@ -60,7 +64,7 @@ public class HouseholdIndexModel : PageModel
             return LocalRedirect("/billsweb/auth/login");
         }
 
-        var success = await _apiClient.InviteToHouseholdAsync(email, token);
+        var success = await _apiClient.InviteToHouseholdAsync(email, shareExistingBills, token);
         
         if (success)
         {

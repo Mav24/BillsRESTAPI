@@ -12,6 +12,7 @@ public class BillsIndexModel : PageModel
     public List<BillViewModel> Bills { get; set; } = new();
     public IEnumerable<IGrouping<string, BillViewModel>> BillsByMonth { get; set; } = Enumerable.Empty<IGrouping<string, BillViewModel>>();
     public string? Message { get; set; }
+    public string? ErrorMessage { get; set; }
 
     public BillsIndexModel(IBillsApiClient apiClient)
     {
@@ -21,18 +22,18 @@ public class BillsIndexModel : PageModel
     public async Task<IActionResult> OnGetAsync()
     {
         var token = HttpContext.Session.GetString("Token");
-        
+
         if (string.IsNullOrEmpty(token))
         {
             return LocalRedirect("/billsweb/auth/login");
         }
 
         Bills = await _apiClient.GetBillsAsync(token);
-        
+
         BillsByMonth = Bills
             .OrderBy(b => b.Date)
             .GroupBy(b => b.Date.ToString("MMMM yyyy"));
-        
+
         return Page();
     }
 

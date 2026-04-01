@@ -316,6 +316,53 @@ body {
     margin-top: 1rem;
 }
 
+/* Shared Bills */
+.bill-card.shared {
+    border-left-color: #667eea;
+    background: #f8f9ff;
+}
+
+.bill-badges {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.badge-shared {
+    background: #667eea;
+    color: white;
+}
+
+.btn-share {
+    background: #667eea;
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.75rem;
+    border-radius: 5px;
+    font-size: 0.875rem;
+}
+
+.btn-share:hover {
+    background: #5a6fd6;
+}
+
+.share-form {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.share-input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.share-input-group .form-control {
+    flex: 1;
+}
+
 /* Household */
 .household-card {
     background: white;

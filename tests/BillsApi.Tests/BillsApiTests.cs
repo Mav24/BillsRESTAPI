@@ -1,14 +1,49 @@
 using System.Data.Common;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using BillsApi.Data;
 using BillsApi.Models;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BillsApi.Tests;
+
+/// <summary>
+/// A fake authentication handler that authenticates every request as the test user.
+/// </summary>
+public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    public const string SchemeName = "TestScheme";
+    public const string TestUserId = "test-user-id";
+    public const string TestUserName = "testuser";
+
+    public TestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : base(options, logger, encoder) { }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, TestUserId),
+            new Claim(ClaimTypes.Name, TestUserName)
+        };
+        var identity = new ClaimsIdentity(claims, SchemeName);
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, SchemeName);
+
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
 
 public class BillsApiTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
@@ -39,14 +74,29 @@ public class BillsApiTests : IClassFixture<WebApplicationFactory<Program>>, IDis
                 {
                     options.UseSqlite(_connection);
                 });
+
+                // Replace authentication with the test scheme so requests are authenticated
+                services.AddAuthentication(TestAuthHandler.SchemeName)
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                        TestAuthHandler.SchemeName, _ => { });
             });
         });
 
-        // Create the test database schema explicitly
+        // Create the test database schema and seed the test user
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
             db.Database.EnsureCreated();
+
+            // Seed a user that matches the identity provided by TestAuthHandler
+            db.Users.Add(new User
+            {
+                Id = TestAuthHandler.TestUserId,
+                Username = TestAuthHandler.TestUserName,
+                Email = "test@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password")
+            });
+            db.SaveChanges();
         }
 
         _client = _factory.CreateClient();

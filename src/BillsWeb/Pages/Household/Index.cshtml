@@ -10,12 +10,18 @@
 
 @if (!string.IsNullOrEmpty(Model.Message))
 {
-    <div class="alert alert-success">@Model.Message</div>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.Message
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
 {
-    <div class="alert alert-danger">@Model.ErrorMessage</div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 @if (Model.Household != null)
@@ -46,6 +52,10 @@
             <form method="post" asp-page-handler="Invite">
                 <div class="form-group">
                     <input type="email" name="email" placeholder="Enter email address" class="form-control" required />
+                </div>
+                <div class="form-check mt-2 mb-2">
+                    <input type="checkbox" name="shareExistingBills" value="true" class="form-check-input" id="shareExistingBills" />
+                    <label class="form-check-label" for="shareExistingBills">Share all current household bills with the new member</label>
                 </div>
                 <button type="submit" class="btn btn-primary">Send Invitation</button>
             </form>

@@ -415,6 +415,12 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
     var invitationsReceived = await db.HouseholdInvitations.Where(hi => hi.Email == userEntity.Email).ToListAsync();
     db.HouseholdInvitations.RemoveRange(invitationsReceived);
 
+    // Delete all bill shares (both shared by and shared with this user)
+    var sharesBy = await db.BillShares.Where(s => s.SharedByUserId == userId).ToListAsync();
+    db.BillShares.RemoveRange(sharesBy);
+    var sharesWith = await db.BillShares.Where(s => s.SharedWithUserId == userId).ToListAsync();
+    db.BillShares.RemoveRange(sharesWith);
+
     // Delete the user
     db.Users.Remove(userEntity);
 
@@ -444,7 +450,7 @@ app.MapDelete("/auth/account", async (BillsDbContext db, ClaimsPrincipal user) =
 .RequireAuthorization()
 .WithName("DeleteAccount");
 
-// GET /bills - Get all bills for the authenticated user OR their household
+// GET /bills - Get all bills for the authenticated user OR their household, plus bills shared with them
 app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -455,21 +461,77 @@ app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
         return Results.NotFound(new { error = "User not found" });
     }
 
-    // If user is in a household, return all household bills
+    List<Bill> ownBills;
+
+    // If user is in a household, return all household bills + their own private/specifically-shared bills
     if (userEntity.HouseholdId is not null)
     {
-        return Results.Ok(await db.Bills
-            .Where(b => b.HouseholdId == userEntity.HouseholdId)
-            .ToListAsync());
+        ownBills = await db.Bills
+            .Where(b => b.HouseholdId == userEntity.HouseholdId || b.UserId == userId)
+            .ToListAsync();
+    }
+    else
+    {
+        // Otherwise, return only their personal bills
+        ownBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
     }
 
-    // Otherwise, return only their personal bills
-    return Results.Ok(await db.Bills.Where(b => b.UserId == userId).ToListAsync());
+    // Also include bills shared with this user (from outside their household)
+    var sharedBillResults = new List<object>();
+    try
+    {
+        var sharedBills = await db.BillShares
+            .Where(s => s.SharedWithUserId == userId)
+            .Include(s => s.Bill)
+            .Include(s => s.SharedByUser)
+            .Select(s => new
+            {
+                s.Bill!.Id,
+                s.Bill.UserId,
+                s.Bill.HouseholdId,
+                s.Bill.BillName,
+                s.Bill.Amount,
+                s.Bill.Date,
+                s.Bill.AmountOverMinimum,
+                s.Bill.IsPaid,
+                s.Bill.PaidDate,
+                SharedBy = (string?)s.SharedByUser!.Username,
+                IsShared = true
+            })
+            .ToListAsync();
+        sharedBillResults.AddRange(sharedBills.Cast<object>());
+    }
+    catch (Microsoft.Data.SqlClient.SqlException)
+    {
+        // BillShares table may not exist yet; gracefully return only own bills
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException)
+    {
+        // BillShares table may not exist yet (dev/SQLite)
+    }
+
+    // Mark own bills so the client can distinguish
+    var ownBillResults = ownBills.Select(b => (object)new
+    {
+        b.Id,
+        b.UserId,
+        b.HouseholdId,
+        b.BillName,
+        b.Amount,
+        b.Date,
+        b.AmountOverMinimum,
+        b.IsPaid,
+        b.PaidDate,
+        SharedBy = (string?)null,
+        IsShared = false
+    });
+
+    return Results.Ok(ownBillResults.Concat(sharedBillResults));
 })
 .RequireAuthorization()
 .WithName("GetAllBills");
 
-// GET /bills/{id} - Get single bill (must be owned by user OR in their household)
+// GET /bills/{id} - Get single bill (must be owned by user, in their household, or shared with them)
 app.MapGet("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -482,11 +544,11 @@ app.MapGet("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal user
 
     Bill? bill;
 
-    // If in household, can access any household bill
+    // If in household, can access any household bill or their own bill
     if (userEntity.HouseholdId is not null)
     {
         bill = await db.Bills.FirstOrDefaultAsync(b => 
-            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+            b.Id == id && (b.HouseholdId == userEntity.HouseholdId || b.UserId == userId));
     }
     else
     {
@@ -494,13 +556,38 @@ app.MapGet("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal user
             b.Id == id && b.UserId == userId);
     }
 
+    // Also check if the bill is shared with this user
+    if (bill is null)
+    {
+        try
+        {
+            var shared = await db.BillShares
+                .Include(s => s.Bill)
+                .FirstOrDefaultAsync(s => s.BillId == id && s.SharedWithUserId == userId);
+            bill = shared?.Bill;
+        }
+        catch (Microsoft.Data.SqlClient.SqlException) { }
+        catch (Microsoft.Data.Sqlite.SqliteException) { }
+    }
+
     return bill is not null
-        ? Results.Ok(bill)
+        ? Results.Ok(new
+        {
+            bill.Id,
+            bill.UserId,
+            bill.HouseholdId,
+            bill.BillName,
+            bill.Amount,
+            bill.Date,
+            bill.AmountOverMinimum,
+            bill.IsPaid,
+            bill.PaidDate
+        })
         : Results.NotFound(new { error = "Bill not found" });
 })
 .RequireAuthorization()
 .WithName("GetBillById");
-// POST /bills - Create a new bill (associates with household if user is in one)
+// POST /bills - Create a new bill with visibility control
 app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -529,10 +616,33 @@ app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal
         return Results.BadRequest(new { error = "AmountOverMinimum cannot be negative" });
     }
 
+    // Determine visibility based on ShareWith
+    var shareWith = input.ShareWith?.Trim().ToLowerInvariant() ?? "";
+    Guid? householdId = null;
+    User? shareTarget = null;
+
+    if (shareWith == "household" && userEntity.HouseholdId is not null)
+    {
+        householdId = userEntity.HouseholdId;
+    }
+    else if (shareWith != "" && shareWith != "private" && shareWith != "household")
+    {
+        // ShareWith is a specific email
+        shareTarget = await db.Users.FirstOrDefaultAsync(u => u.Email == input.ShareWith);
+        if (shareTarget is null)
+        {
+            return Results.BadRequest(new { error = "No user found with that email" });
+        }
+        if (shareTarget.Id == userId)
+        {
+            return Results.BadRequest(new { error = "You cannot share a bill with yourself" });
+        }
+    }
+
     var bill = new Bill
     {
         UserId = userId,
-        HouseholdId = userEntity.HouseholdId, // Automatically associates with household
+        HouseholdId = householdId,
         BillName = input.BillName.Trim(),
         Amount = input.Amount,
         Date = input.Date,
@@ -544,11 +654,36 @@ app.MapPost("/bills", async (BillInput input, BillsDbContext db, ClaimsPrincipal
     db.Bills.Add(bill);
     await db.SaveChangesAsync();
 
-    return Results.Created($"/bills/{bill.Id}", bill);
+    // Create BillShare if sharing with a specific person
+    if (shareTarget is not null)
+    {
+        var share = new BillShare
+        {
+            BillId = bill.Id,
+            SharedByUserId = userId,
+            SharedWithUserId = shareTarget.Id,
+            SharedAt = DateTime.UtcNow
+        };
+        db.BillShares.Add(share);
+        await db.SaveChangesAsync();
+    }
+
+    return Results.Created($"/bills/{bill.Id}", new
+    {
+        bill.Id,
+        bill.UserId,
+        bill.HouseholdId,
+        bill.BillName,
+        bill.Amount,
+        bill.Date,
+        bill.AmountOverMinimum,
+        bill.IsPaid,
+        bill.PaidDate
+    });
 })
 .RequireAuthorization()
 .WithName("CreateBill");
-// PUT /bills/{id} - Update bill (must be in same household or owned by user)
+// PUT /bills/{id} - Update bill (must be owned by user or in same household)
 app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, ClaimsPrincipal user) =>
 {
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -583,7 +718,7 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
     if (userEntity.HouseholdId is not null)
     {
         bill = await db.Bills.FirstOrDefaultAsync(b => 
-            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+            b.Id == id && (b.HouseholdId == userEntity.HouseholdId || b.UserId == userId));
     }
     else
     {
@@ -596,6 +731,42 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
         return Results.NotFound(new { error = "Bill not found" });
     }
 
+    // Only the bill owner can change sharing settings
+    if (bill.UserId == userId && input.ShareWith is not null)
+    {
+        var shareWith = input.ShareWith.Trim().ToLowerInvariant();
+
+        // Remove existing shares for this bill
+        var existingShares = await db.BillShares.Where(s => s.BillId == id).ToListAsync();
+        db.BillShares.RemoveRange(existingShares);
+
+        if (shareWith == "household" && userEntity.HouseholdId is not null)
+        {
+            bill.HouseholdId = userEntity.HouseholdId;
+        }
+        else if (shareWith == "private" || shareWith == "")
+        {
+            bill.HouseholdId = null;
+        }
+        else
+        {
+            // Specific email
+            bill.HouseholdId = null;
+            var shareTarget = await db.Users.FirstOrDefaultAsync(u => u.Email == input.ShareWith);
+            if (shareTarget is not null && shareTarget.Id != userId)
+            {
+                var share = new BillShare
+                {
+                    BillId = bill.Id,
+                    SharedByUserId = userId,
+                    SharedWithUserId = shareTarget.Id,
+                    SharedAt = DateTime.UtcNow
+                };
+                db.BillShares.Add(share);
+            }
+        }
+    }
+
     bill.BillName = input.BillName.Trim();
     bill.Amount = input.Amount;
     bill.Date = input.Date;
@@ -605,7 +776,18 @@ app.MapPut("/bills/{id}", async (int id, BillInput input, BillsDbContext db, Cla
 
     await db.SaveChangesAsync();
 
-    return Results.Ok(bill);
+    return Results.Ok(new
+    {
+        bill.Id,
+        bill.UserId,
+        bill.HouseholdId,
+        bill.BillName,
+        bill.Amount,
+        bill.Date,
+        bill.AmountOverMinimum,
+        bill.IsPaid,
+        bill.PaidDate
+    });
 })
 .RequireAuthorization()
 .WithName("UpdateBill");
@@ -622,11 +804,11 @@ app.MapDelete("/bills/{id}", async (int id, BillsDbContext db, ClaimsPrincipal u
 
     Bill? bill;
 
-    // If in household, can delete any household bill
+    // If in household, can delete any household bill or their own bill
     if (userEntity.HouseholdId is not null)
     {
         bill = await db.Bills.FirstOrDefaultAsync(b => 
-            b.Id == id && b.HouseholdId == userEntity.HouseholdId);
+            b.Id == id && (b.HouseholdId == userEntity.HouseholdId || b.UserId == userId));
     }
     else
     {
@@ -712,11 +894,14 @@ app.MapPost("/households", async (CreateHouseholdRequest request, BillsDbContext
     db.Households.Add(household);
     userEntity.HouseholdId = household.Id;
 
-    // Migrate existing bills to household
-    var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
-    foreach (var bill in userBills)
+    // Only migrate existing bills to household if user chose to share them
+    if (request.ShareExistingBills)
     {
-        bill.HouseholdId = household.Id;
+        var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
+        foreach (var bill in userBills)
+        {
+            bill.HouseholdId = household.Id;
+        }
     }
 
     await db.SaveChangesAsync();
@@ -794,7 +979,8 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
         InvitedByUserId = userId,
         CreatedAt = DateTime.UtcNow,
         ExpiresAt = DateTime.UtcNow.AddDays(7),
-        Accepted = false
+        Accepted = false,
+        ShareInviterBills = request.ShareExistingBills
     };
 
     db.HouseholdInvitations.Add(invitation);
@@ -829,7 +1015,7 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
 .WithName("InviteToHousehold");
 
 // GET /household-invitation - Display invitation acceptance page
-app.MapGet("/household-invitation", async (HttpContext context, BillsDbContext db, string? token) =>
+app.MapGet("/household-invitation", async (HttpContext context, BillsDbContext db, IConfiguration config, string? token) =>
 {
     if (string.IsNullOrWhiteSpace(token))
     {
@@ -850,7 +1036,11 @@ app.MapGet("/household-invitation", async (HttpContext context, BillsDbContext d
         return Results.Content(GetInvitationErrorPage("This invitation is invalid or has expired"), "text/html");
     }
 
-    return Results.Content(GetInvitationAcceptancePage(invitation.Household!.Name, invitation.InvitedByUser!.Username, invitation.Email, token), "text/html");
+    var googlePlayUrl = config["AppLinks:GooglePlayUrl"] ?? "";
+    var appStoreUrl = config["AppLinks:AppStoreUrl"] ?? "";
+    var webAppUrl = config["AppLinks:WebAppUrl"] ?? "";
+
+    return Results.Content(GetInvitationAcceptancePage(invitation.Household!.Name, invitation.InvitedByUser!.Username, invitation.Email, token, googlePlayUrl, appStoreUrl, webAppUrl), "text/html");
 })
 .WithName("HouseholdInvitationPage");
 
@@ -896,11 +1086,27 @@ app.MapPost("/households/accept-invitation", async (AcceptInvitationRequest requ
     invitation.Accepted = true;
     invitation.AcceptedAt = DateTime.UtcNow;
 
-    // Migrate user's bills to household
-    var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
-    foreach (var bill in userBills)
+    // Only migrate the new member's bills to the household if they chose to share
+    if (request.ShareExistingBills)
     {
-        bill.HouseholdId = invitation.HouseholdId;
+        var userBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
+        foreach (var bill in userBills)
+        {
+            bill.HouseholdId = invitation.HouseholdId;
+        }
+    }
+
+    // If the inviter chose to share their existing bills, set HouseholdId on the inviter's
+    // personal bills that don't already belong to the household
+    if (invitation.ShareInviterBills)
+    {
+        var inviterBills = await db.Bills
+            .Where(b => b.UserId == invitation.InvitedByUserId && b.HouseholdId == null)
+            .ToListAsync();
+        foreach (var bill in inviterBills)
+        {
+            bill.HouseholdId = invitation.HouseholdId;
+        }
     }
 
     await db.SaveChangesAsync();
@@ -1036,6 +1242,151 @@ app.MapDelete("/households", async (BillsDbContext db, ClaimsPrincipal user) =>
 .RequireAuthorization()
 .WithName("DeleteHousehold");
 
+// ============ BILL SHARING ENDPOINTS ============
+
+// POST /bills/{id}/share - Share a specific bill with another user by email
+app.MapPost("/bills/{id}/share", async (int id, ShareBillRequest request, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.BadRequest(new { error = "Email is required" });
+    }
+
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+
+    if (bill is null)
+    {
+        return Results.NotFound(new { error = "Bill not found or you are not the owner" });
+    }
+
+    var targetUser = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+    if (targetUser is null)
+    {
+        return Results.NotFound(new { error = "No user found with that email" });
+    }
+
+    if (targetUser.Id == userId)
+    {
+        return Results.BadRequest(new { error = "You cannot share a bill with yourself" });
+    }
+
+    // Check if already shared
+    var existingShare = await db.BillShares
+        .FirstOrDefaultAsync(s => s.BillId == id && s.SharedWithUserId == targetUser.Id);
+
+    if (existingShare is not null)
+    {
+        return Results.BadRequest(new { error = "This bill is already shared with that user" });
+    }
+
+    var share = new BillShare
+    {
+        BillId = id,
+        SharedByUserId = userId,
+        SharedWithUserId = targetUser.Id,
+        SharedAt = DateTime.UtcNow
+    };
+
+    db.BillShares.Add(share);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = $"Bill shared with {targetUser.Username}" });
+})
+.RequireAuthorization()
+.WithName("ShareBill");
+
+// DELETE /bills/{id}/share/{email} - Unshare a bill from a user
+app.MapDelete("/bills/{id}/share/{email}", async (int id, string email, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+
+    if (bill is null)
+    {
+        return Results.NotFound(new { error = "Bill not found or you are not the owner" });
+    }
+
+    var targetUser = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+    if (targetUser is null)
+    {
+        return Results.NotFound(new { error = "No user found with that email" });
+    }
+
+    var share = await db.BillShares
+        .FirstOrDefaultAsync(s => s.BillId == id && s.SharedWithUserId == targetUser.Id);
+
+    if (share is null)
+    {
+        return Results.NotFound(new { error = "This bill is not shared with that user" });
+    }
+
+    db.BillShares.Remove(share);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = $"Bill unshared from {targetUser.Username}" });
+})
+.RequireAuthorization()
+.WithName("UnshareBill");
+
+// GET /bills/{id}/shares - List all users a bill is shared with
+app.MapGet("/bills/{id}/shares", async (int id, BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+
+    if (bill is null)
+    {
+        return Results.NotFound(new { error = "Bill not found or you are not the owner" });
+    }
+
+    var shares = await db.BillShares
+        .Where(s => s.BillId == id)
+        .Include(s => s.SharedWithUser)
+        .Select(s => new
+        {
+            s.SharedWithUser!.Id,
+            s.SharedWithUser.Username,
+            s.SharedWithUser.Email,
+            s.SharedAt
+        })
+        .ToListAsync();
+
+    return Results.Ok(shares);
+})
+.RequireAuthorization()
+.WithName("GetBillShares");
+
+// GET /bills/shared-with-me - Get only bills others have shared with the current user
+app.MapGet("/bills/shared-with-me", async (BillsDbContext db, ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+    var sharedBills = await db.BillShares
+        .Where(s => s.SharedWithUserId == userId)
+        .Include(s => s.Bill)
+        .Include(s => s.SharedByUser)
+        .Select(s => new
+        {
+            s.Bill!.Id,
+            s.Bill.BillName,
+            s.Bill.Amount,
+            s.Bill.Date,
+            s.Bill.AmountOverMinimum,
+            s.Bill.IsPaid,
+            s.Bill.PaidDate,
+            SharedBy = s.SharedByUser!.Username,
+            s.SharedAt
+        })
+        .ToListAsync();
+
+    return Results.Ok(sharedBills);
+})
+.RequireAuthorization()
+.WithName("GetBillsSharedWithMe");
+
 app.Run();
 
 // Helper methods - must be BEFORE the type declaration
@@ -1079,7 +1430,7 @@ static async Task<RefreshToken> GenerateRefreshTokenAsync(string userId, BillsDb
     return refreshToken;
 }
 
-static string GetInvitationAcceptancePage(string householdName, string inviterUsername, string invitedEmail, string token)
+static string GetInvitationAcceptancePage(string householdName, string inviterUsername, string invitedEmail, string token, string googlePlayUrl, string appStoreUrl, string webAppUrl)
 {
     return $@"
 <!DOCTYPE html>
@@ -1251,12 +1602,15 @@ static string GetInvitationAcceptancePage(string householdName, string inviterUs
             <p id=""successMessage"">You've successfully joined {householdName}!</p>
             <p>Download the Bills Tracker app to manage your household bills:</p>
             <div class=""app-links"">
-                <a href=""#"" class=""app-link"">📱 Download on App Store</a>
-                <a href=""#"" class=""app-link"">🤖 Get it on Google Play</a>
+{(string.IsNullOrEmpty(appStoreUrl) ? "" : $@"                <a href=""{appStoreUrl}"" class=""app-link"" target=""_blank"" rel=""noopener noreferrer"">📱 Download on App Store</a>")}
+{(string.IsNullOrEmpty(googlePlayUrl) ? "" : $@"                <a href=""{googlePlayUrl}"" class=""app-link"" target=""_blank"" rel=""noopener noreferrer"">🤖 Get it on Google Play</a>")}
             </div>
-            <p style=""margin-top: 20px; font-size: 0.9em; color: #999;"">
-                Already have the app? Open it now to see your household bills!
-            </p>
+{(string.IsNullOrEmpty(webAppUrl) ? "" : $@"            <div style=""margin-top: 20px;"">
+                <a href=""{webAppUrl}"" class=""btn"" style=""display: inline-block; width: auto; padding: 12px 30px; text-decoration: none;"">Go to Bills Tracker</a>
+            </div>
+            <p style=""margin-top: 15px; font-size: 0.9em; color: #999;"">
+                You will be redirected automatically in <span id=""countdown"">5</span> seconds...
+            </p>")}
         </div>
 
         <div id=""message"" class=""message""></div>
@@ -1281,6 +1635,20 @@ static string GetInvitationAcceptancePage(string householdName, string inviterUs
         function showSuccess(householdName) {{
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('successSection').style.display = 'block';
+
+            var webAppUrl = '{webAppUrl}';
+            if (webAppUrl) {{
+                var seconds = 5;
+                var countdownEl = document.getElementById('countdown');
+                var interval = setInterval(function() {{
+                    seconds--;
+                    if (countdownEl) countdownEl.textContent = seconds;
+                    if (seconds <= 0) {{
+                        clearInterval(interval);
+                        window.location.href = webAppUrl;
+                    }}
+                }}, 1000);
+            }}
         }}
 
         async function handleLogin(event) {{
@@ -1404,5 +1772,5 @@ static string GetInvitationErrorPage(string errorMessage)
 // End of program
 
 // Add these request record types at the bottom with other records
-record CreateHouseholdRequest(string Name);
-record InviteRequest(string Email);
+record CreateHouseholdRequest(string Name, bool ShareExistingBills);
+record InviteRequest(string Email, bool ShareExistingBills);

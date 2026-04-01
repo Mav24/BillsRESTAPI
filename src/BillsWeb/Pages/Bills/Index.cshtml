@@ -9,9 +9,14 @@
     <a asp-page="/Bills/Create" class="btn btn-primary">Add New Bill</a>
 </div>
 
-@if (!string.IsNullOrEmpty(Model.Message))
+@if (!string.IsNullOrEmpty(Model.Message) || TempData["Message"] is string msg)
 {
-    <div class="alert alert-success">@Model.Message</div>
+    <div class="alert alert-success">@(Model.Message ?? TempData["Message"]?.ToString())</div>
+}
+
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
 }
 
 @if (Model.Bills.Any())
@@ -19,12 +24,13 @@
     @foreach (var monthGroup in Model.BillsByMonth)
     {
         var monthBills = monthGroup.ToList();
-        var fullTotal = monthBills.Sum(b => b.Amount);
-        var theyOweTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.AmountOverMinimum);
-        var myShareTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
-        var paidTotal = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount);
-        var unpaidCount = monthBills.Count(b => !b.IsPaid);
-        
+        var ownBills = monthBills.Where(b => !b.IsShared).ToList();
+        var fullTotal = ownBills.Sum(b => b.Amount);
+        var theyOweTotal = ownBills.Where(b => !b.IsPaid).Sum(b => b.AmountOverMinimum);
+        var myShareTotal = ownBills.Where(b => !b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
+        var paidTotal = ownBills.Where(b => b.IsPaid).Sum(b => b.Amount);
+        var unpaidCount = ownBills.Count(b => !b.IsPaid);
+
         <div class="month-section">
             <div class="month-header">
                 <div class="month-title-row">
@@ -35,7 +41,7 @@
                         <button type="submit" class="btn-month-paid @(unpaidCount == 0 ? "paid" : "unpaid")">
                             @if (unpaidCount == 0)
                             {
-                                <span>? PAID</span>
+                                <span>✓ PAID</span>
                             }
                             else
                             {
@@ -65,21 +71,27 @@
                     }
                 </div>
             </div>
-            
+
             <div class="bills-grid">
                 @foreach (var bill in monthBills)
                 {
-                    <div class="bill-card @(bill.IsPaid ? "paid" : "unpaid")">
+                    <div class="bill-card @(bill.IsPaid ? "paid" : "unpaid") @(bill.IsShared ? "shared" : "")">
                         <div class="bill-header">
                             <h3>@bill.BillName</h3>
-                            @if (bill.IsPaid)
-                            {
-                                <span class="badge badge-success">Paid</span>
-                            }
-                            else
-                            {
-                                <span class="badge badge-warning">Unpaid</span>
-                            }
+                            <div class="bill-badges">
+                                @if (bill.IsShared)
+                                {
+                                    <span class="badge badge-shared">Shared by @bill.SharedBy</span>
+                                }
+                                @if (bill.IsPaid)
+                                {
+                                    <span class="badge badge-success">Paid</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">Unpaid</span>
+                                }
+                            </div>
                         </div>
                         <div class="bill-body">
                             <p><strong>Full Amount:</strong> $@bill.Amount.ToString("N2")</p>
@@ -95,10 +107,13 @@
                             }
                         </div>
                         <div class="bill-actions">
-                            <a asp-page="/Bills/Edit" asp-route-id="@bill.Id" class="btn btn-sm btn-secondary">Edit</a>
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@bill.Id" style="display: inline;">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this bill?')">Delete</button>
-                            </form>
+                            @if (!bill.IsShared)
+                            {
+                                <a asp-page="/Bills/Edit" asp-route-id="@bill.Id" class="btn btn-sm btn-secondary">Edit</a>
+                                <form method="post" asp-page-handler="Delete" asp-route-id="@bill.Id" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this bill?')">Delete</button>
+                                </form>
+                            }
                         </div>
                     </div>
                 }
@@ -111,4 +126,13 @@ else
     <div class="empty-state">
         <p>No bills found. <a asp-page="/Bills/Create">Add your first bill</a></p>
     </div>
+}
+
+@section Scripts {
+    <script>
+        function toggleShareForm(billId) {
+            var form = document.getElementById('share-form-' + billId);
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
 }

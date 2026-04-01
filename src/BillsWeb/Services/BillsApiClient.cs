@@ -92,53 +92,110 @@ public class BillsApiClient : IBillsApiClient
         return JsonSerializer.Deserialize<BillViewModel>(json, _jsonOptions);
     }
 
-    public async Task<BillViewModel?> CreateBillAsync(BillViewModel bill, string token)
+    public async Task<(BillViewModel? Bill, string? ErrorMessage)> CreateBillAsync(BillViewModel bill, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         var content = new StringContent(JsonSerializer.Serialize(bill, _jsonOptions), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync("bills", content);
-        
-        if (!response.IsSuccessStatusCode)
-            return null;
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<BillViewModel>(json, _jsonOptions);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            // Try to extract error message from API response
+            try
+            {
+                var errorObj = JsonSerializer.Deserialize<JsonElement>(json);
+                if (errorObj.TryGetProperty("error", out var errorProp))
+                    return (null, errorProp.GetString());
+            }
+            catch { }
+            return (null, $"API returned {(int)response.StatusCode}");
+        }
+
+        var result = JsonSerializer.Deserialize<BillViewModel>(json, _jsonOptions);
+        return (result, null);
     }
 
-    public async Task<bool> UpdateBillAsync(int id, BillViewModel bill, string token)
+    public async Task<(bool Success, string? ErrorMessage)> UpdateBillAsync(int id, BillViewModel bill, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         var content = new StringContent(JsonSerializer.Serialize(bill, _jsonOptions), Encoding.UTF8, "application/json");
         var response = await _httpClient.PutAsync($"bills/{id}", content);
-        
-        return response.IsSuccessStatusCode;
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            try
+            {
+                var errorObj = JsonSerializer.Deserialize<JsonElement>(json);
+                if (errorObj.TryGetProperty("error", out var errorProp))
+                    return (false, errorProp.GetString());
+            }
+            catch { }
+            return (false, $"API returned {(int)response.StatusCode}");
+        }
+
+        return (true, null);
     }
 
     public async Task<bool> ToggleBillPaidAsync(int id, bool isPaid, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         // First get the bill to preserve other fields
         var bill = await GetBillAsync(id, token);
         if (bill == null)
             return false;
-        
+
         // Update only paid status and paid date
         bill.IsPaid = isPaid;
         bill.PaidDate = isPaid ? DateTime.Now : null;
-        
+
         // Use the existing PUT endpoint to update the bill
-        return await UpdateBillAsync(id, bill, token);
+        var (success, _) = await UpdateBillAsync(id, bill, token);
+        return success;
     }
 
     public async Task<bool> DeleteBillAsync(int id, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         var response = await _httpClient.DeleteAsync($"bills/{id}");
         return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> ShareBillAsync(int billId, string email, string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var request = new { email };
+        var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync($"bills/{billId}/share", content);
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UnshareBillAsync(int billId, string email, string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.DeleteAsync($"bills/{billId}/share/{Uri.EscapeDataString(email)}");
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<List<BillShareViewModel>> GetBillSharesAsync(int billId, string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.GetAsync($"bills/{billId}/shares");
+        if (!response.IsSuccessStatusCode)
+            return new List<BillShareViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<BillShareViewModel>>(json, _jsonOptions) ?? new List<BillShareViewModel>();
     }
 
     public async Task<HouseholdViewModel?> GetMyHouseholdAsync(string token)
@@ -167,14 +224,14 @@ public class BillsApiClient : IBillsApiClient
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> InviteToHouseholdAsync(string email, string token)
+    public async Task<bool> InviteToHouseholdAsync(string email, bool shareExistingBills, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
-        var request = new { email };
+
+        var request = new { email, shareExistingBills };
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync("households/invite", content);
-        
+
         return response.IsSuccessStatusCode;
     }
 

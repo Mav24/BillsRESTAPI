@@ -54,6 +54,11 @@ public class Bill
     /// Navigation property for the household.
     /// </summary>
     public Household? Household { get; set; }
+
+    /// <summary>
+    /// Navigation property for users this bill is shared with.
+    /// </summary>
+    public ICollection<BillShare> Shares { get; set; } = new List<BillShare>();
 }
 
 

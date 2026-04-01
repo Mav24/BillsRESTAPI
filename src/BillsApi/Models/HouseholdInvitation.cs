@@ -51,6 +51,11 @@ public class HouseholdInvitation
     public DateTime? AcceptedAt { get; set; }
 
     /// <summary>
+    /// Whether the inviter chose to share their existing bills with the new member upon acceptance.
+    /// </summary>
+    public bool ShareInviterBills { get; set; }
+
+    /// <summary>
     /// Navigation property for the household.
     /// </summary>
     public Household? Household { get; set; }

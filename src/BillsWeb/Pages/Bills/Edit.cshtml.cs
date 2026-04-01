@@ -15,7 +15,14 @@ public class EditBillModel : PageModel
     [BindProperty]
     public decimal? TheyOwe { get; set; }
 
+    [BindProperty]
+    public string? ShareWith { get; set; }
+
     public string? ErrorMessage { get; set; }
+
+    public HouseholdViewModel? Household { get; set; }
+
+    public string? CurrentUsername { get; set; }
 
     public EditBillModel(IBillsApiClient apiClient)
     {
@@ -36,8 +43,37 @@ public class EditBillModel : PageModel
             return NotFound();
         }
 
+        if (bill.IsShared)
+        {
+            return LocalRedirect("/billsweb/bills/index");
+        }
+
         Input = bill;
         TheyOwe = bill.AmountOverMinimum;
+
+        CurrentUsername = HttpContext.Session.GetString("Username");
+        Household = await _apiClient.GetMyHouseholdAsync(token);
+
+        // Determine current sharing state
+        if (Household is not null)
+        {
+            // Check if shared with specific person
+            var shares = await _apiClient.GetBillSharesAsync(id, token);
+            if (shares.Count > 0)
+            {
+                ShareWith = shares[0].Email;
+            }
+            else if (bill.HouseholdId is not null)
+            {
+                // Bill is associated with the household
+                ShareWith = "household";
+            }
+            else
+            {
+                ShareWith = "private";
+            }
+        }
+
         return Page();
     }
 
@@ -51,17 +87,22 @@ public class EditBillModel : PageModel
 
         if (!ModelState.IsValid)
         {
+            CurrentUsername = HttpContext.Session.GetString("Username");
+            Household = await _apiClient.GetMyHouseholdAsync(token);
             return Page();
         }
 
         // AmountOverMinimum stores what they owe; default to 0 (you pay the full amount)
         Input.AmountOverMinimum = TheyOwe ?? 0;
+        Input.ShareWith = ShareWith ?? "private";
 
-        var success = await _apiClient.UpdateBillAsync(Input.Id, Input, token);
-        
+        var (success, errorMessage) = await _apiClient.UpdateBillAsync(Input.Id, Input, token);
+
         if (!success)
         {
-            ErrorMessage = "Failed to update bill";
+            ErrorMessage = errorMessage ?? "Failed to update bill";
+            CurrentUsername = HttpContext.Session.GetString("Username");
+            Household = await _apiClient.GetMyHouseholdAsync(token);
             return Page();
         }
 

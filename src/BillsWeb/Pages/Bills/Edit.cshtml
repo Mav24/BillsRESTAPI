@@ -40,6 +40,26 @@
             <span asp-validation-for="TheyOwe" class="text-danger"></span>
         </div>
 
+        @if (Model.Household is not null)
+        {
+            <div class="form-group">
+                <label for="ShareWith">Who can see this bill?</label>
+                <select asp-for="ShareWith" class="form-control">
+                    <option value="household">Whole Household (@Model.Household.Name)</option>
+                    @foreach (var member in Model.Household.Members.Where(m => !string.Equals(m.Username, Model.CurrentUsername, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        <option value="@member.Email">Only @member.Username</option>
+                    }
+                    <option value="private">Just Me</option>
+                </select>
+                <small class="form-text text-muted">Choose who sees this bill in their bill list</small>
+            </div>
+        }
+        else
+        {
+            <input type="hidden" asp-for="ShareWith" value="private" />
+        }
+
         <div class="form-check">
             <input asp-for="Input.IsPaid" class="form-check-input" type="checkbox" />
             <label asp-for="Input.IsPaid" class="form-check-label"></label>

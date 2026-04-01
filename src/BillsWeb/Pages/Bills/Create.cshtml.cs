@@ -15,14 +15,21 @@ public class CreateBillModel : PageModel
     [BindProperty]
     public decimal? TheyOwe { get; set; }
 
+    [BindProperty]
+    public string? ShareWith { get; set; }
+
     public string? ErrorMessage { get; set; }
+
+    public HouseholdViewModel? Household { get; set; }
+
+    public string? CurrentUsername { get; set; }
 
     public CreateBillModel(IBillsApiClient apiClient)
     {
         _apiClient = apiClient;
     }
 
-    public IActionResult OnGet()
+    public async Task<IActionResult> OnGetAsync()
     {
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
@@ -31,7 +38,10 @@ public class CreateBillModel : PageModel
         }
 
         Input.Date = DateTime.Now;
-        Input.IsPaid = false; // New bills are never paid on creation
+        Input.IsPaid = false;
+
+        CurrentUsername = HttpContext.Session.GetString("Username");
+        Household = await _apiClient.GetMyHouseholdAsync(token);
         return Page();
     }
 
@@ -45,17 +55,22 @@ public class CreateBillModel : PageModel
 
         if (!ModelState.IsValid)
         {
+            CurrentUsername = HttpContext.Session.GetString("Username");
+            Household = await _apiClient.GetMyHouseholdAsync(token);
             return Page();
         }
 
         // AmountOverMinimum stores what they owe; default to 0 (you pay the full amount)
         Input.AmountOverMinimum = TheyOwe ?? 0;
+        Input.ShareWith = ShareWith ?? "private";
 
-        var result = await _apiClient.CreateBillAsync(Input, token);
-        
+        var (result, errorMessage) = await _apiClient.CreateBillAsync(Input, token);
+
         if (result == null)
         {
-            ErrorMessage = "Failed to create bill";
+            ErrorMessage = errorMessage ?? "Failed to create bill";
+            CurrentUsername = HttpContext.Session.GetString("Username");
+            Household = await _apiClient.GetMyHouseholdAsync(token);
             return Page();
         }
 

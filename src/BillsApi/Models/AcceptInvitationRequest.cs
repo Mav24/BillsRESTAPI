@@ -3,4 +3,4 @@ namespace BillsApi.Models;
 /// <summary>
 /// Request to accept a household invitation.
 /// </summary>
-public record AcceptInvitationRequest(string Token);
+public record AcceptInvitationRequest(string Token, bool ShareExistingBills = false);
