@@ -476,6 +476,31 @@ app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
         ownBills = await db.Bills.Where(b => b.UserId == userId).ToListAsync();
     }
 
+    // Load share details for own bills (separate query so it can fail gracefully)
+    var ownBillIds = ownBills.Select(b => b.Id).ToList();
+    var sharesByBillId = new Dictionary<int, List<string>>();
+    try
+    {
+        var shares = await db.BillShares
+            .Where(s => ownBillIds.Contains(s.BillId))
+            .Include(s => s.SharedWithUser)
+            .ToListAsync();
+
+        sharesByBillId = shares
+            .GroupBy(s => s.BillId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(s => s.SharedWithUser?.Username ?? "Unknown").ToList());
+    }
+    catch (Microsoft.Data.SqlClient.SqlException)
+    {
+        // BillShares table may not exist yet
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException)
+    {
+        // BillShares table may not exist yet (dev/SQLite)
+    }
+
     // Also include bills shared with this user (from outside their household)
     var sharedBillResults = new List<object>();
     try
@@ -496,7 +521,9 @@ app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
                 s.Bill.IsPaid,
                 s.Bill.PaidDate,
                 SharedBy = (string?)s.SharedByUser!.Username,
-                IsShared = true
+                IsShared = true,
+                ShareWith = (string?)null,
+                SharedWithNames = new List<string>()
             })
             .ToListAsync();
         sharedBillResults.AddRange(sharedBills.Cast<object>());
@@ -511,19 +538,29 @@ app.MapGet("/bills", async (BillsDbContext db, ClaimsPrincipal user) =>
     }
 
     // Mark own bills so the client can distinguish
-    var ownBillResults = ownBills.Select(b => (object)new
+    var ownBillResults = ownBills.Select(b =>
     {
-        b.Id,
-        b.UserId,
-        b.HouseholdId,
-        b.BillName,
-        b.Amount,
-        b.Date,
-        b.AmountOverMinimum,
-        b.IsPaid,
-        b.PaidDate,
-        SharedBy = (string?)null,
-        IsShared = false
+        sharesByBillId.TryGetValue(b.Id, out var sharedWithNames);
+        return (object)new
+        {
+            b.Id,
+            b.UserId,
+            b.HouseholdId,
+            b.BillName,
+            b.Amount,
+            b.Date,
+            b.AmountOverMinimum,
+            b.IsPaid,
+            b.PaidDate,
+            SharedBy = (string?)null,
+            IsShared = false,
+            ShareWith = b.HouseholdId != null
+                ? "household"
+                : (sharedWithNames != null && sharedWithNames.Count > 0)
+                    ? "individual"
+                    : (string?)null,
+            SharedWithNames = sharedWithNames ?? new List<string>()
+        };
     });
 
     return Results.Ok(ownBillResults.Concat(sharedBillResults));

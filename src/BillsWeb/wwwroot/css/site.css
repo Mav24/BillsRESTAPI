@@ -334,6 +334,22 @@ body {
     color: white;
 }
 
+.badge-household {
+    background: #17a2b8;
+    color: white;
+}
+
+.badge-individual {
+    background: #6f42c1;
+    color: white;
+}
+
+.badge-shared-name {
+    background: #e9ecef;
+    color: #495057;
+    font-weight: 500;
+}
+
 .btn-share {
     background: #667eea;
     color: white;

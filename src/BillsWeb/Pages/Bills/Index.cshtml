@@ -24,12 +24,11 @@
     @foreach (var monthGroup in Model.BillsByMonth)
     {
         var monthBills = monthGroup.ToList();
-        var ownBills = monthBills.Where(b => !b.IsShared).ToList();
-        var fullTotal = ownBills.Sum(b => b.Amount);
-        var theyOweTotal = ownBills.Where(b => !b.IsPaid).Sum(b => b.AmountOverMinimum);
-        var myShareTotal = ownBills.Where(b => !b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
-        var paidTotal = ownBills.Where(b => b.IsPaid).Sum(b => b.Amount);
-        var unpaidCount = ownBills.Count(b => !b.IsPaid);
+        var fullTotal = monthBills.Sum(b => b.Amount);
+        var theyOweTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.AmountOverMinimum);
+        var myShareTotal = monthBills.Where(b => !b.IsPaid).Sum(b => b.Amount - b.AmountOverMinimum);
+        var paidTotal = monthBills.Where(b => b.IsPaid).Sum(b => b.Amount);
+        var unpaidCount = monthBills.Count(b => !b.IsPaid);
 
         <div class="month-section">
             <div class="month-header">
@@ -79,19 +78,31 @@
                         <div class="bill-header">
                             <h3>@bill.BillName</h3>
                             <div class="bill-badges">
-                                @if (bill.IsShared)
-                                {
-                                    <span class="badge badge-shared">Shared by @bill.SharedBy</span>
-                                }
-                                @if (bill.IsPaid)
-                                {
-                                    <span class="badge badge-success">Paid</span>
-                                }
-                                else
-                                {
-                                    <span class="badge badge-warning">Unpaid</span>
-                                }
-                            </div>
+                                    @if (bill.IsShared)
+                                    {
+                                        <span class="badge badge-shared">Shared by @bill.SharedBy</span>
+                                    }
+                                    else if (string.Equals(bill.ShareWith, "household", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge badge-household">👥 Shared</span>
+                                    }
+                                    else if (string.Equals(bill.ShareWith, "individual", StringComparison.OrdinalIgnoreCase) && bill.SharedWithNames.Any())
+                                    {
+                                        <span class="badge badge-individual">👥 Shared</span>
+                                        @foreach (var name in bill.SharedWithNames)
+                                        {
+                                            <span class="badge badge-shared-name">@name</span>
+                                        }
+                                    }
+                                    @if (bill.IsPaid)
+                                    {
+                                        <span class="badge badge-success">Paid</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-warning">Unpaid</span>
+                                    }
+                                </div>
                         </div>
                         <div class="bill-body">
                             <p><strong>Full Amount:</strong> $@bill.Amount.ToString("N2")</p>

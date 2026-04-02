@@ -29,6 +29,8 @@ public class BillViewModel
     public bool IsShared { get; set; }
 
     public string? ShareWith { get; set; }
+
+    public List<string> SharedWithNames { get; set; } = new();
 }
 
 public class BillShareViewModel
