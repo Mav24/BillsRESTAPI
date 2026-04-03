@@ -196,6 +196,12 @@ public class HouseholdsController : ControllerBase
             bill.HouseholdId = null;
         }
 
+        // Remove all bill shares involving this user (shared by them or shared with them)
+        var billShares = await _db.BillShares
+            .Where(s => s.SharedByUserId == userId || s.SharedWithUserId == userId)
+            .ToListAsync();
+        _db.BillShares.RemoveRange(billShares);
+
         // Check if household is now empty
         var remainingMembers = await _db.Users.CountAsync(u => u.HouseholdId == householdId);
         if (remainingMembers == 0)
@@ -247,6 +253,12 @@ public class HouseholdsController : ControllerBase
         {
             bill.HouseholdId = null;
         }
+
+        // Remove all bill shares involving this member (shared by them or shared with them)
+        var billShares = await _db.BillShares
+            .Where(s => s.SharedByUserId == memberId || s.SharedWithUserId == memberId)
+            .ToListAsync();
+        _db.BillShares.RemoveRange(billShares);
 
         await _db.SaveChangesAsync();
 

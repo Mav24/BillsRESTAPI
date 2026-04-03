@@ -1180,6 +1180,12 @@ app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user)
         bill.HouseholdId = null;
     }
 
+    // Remove all bill shares involving this user (shared by them or shared with them)
+    var userBillShares = await db.BillShares
+        .Where(s => s.SharedByUserId == userId || s.SharedWithUserId == userId)
+        .ToListAsync();
+    db.BillShares.RemoveRange(userBillShares);
+
     // Check if household is now empty
     var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId);
     if (remainingMembers == 0)
@@ -1230,6 +1236,12 @@ app.MapDelete("/households/members/{memberId}", async (string memberId, BillsDbC
         bill.HouseholdId = null;
     }
 
+    // Remove all bill shares involving this member (shared by them or shared with them)
+    var memberBillShares = await db.BillShares
+        .Where(s => s.SharedByUserId == memberId || s.SharedWithUserId == memberId)
+        .ToListAsync();
+    db.BillShares.RemoveRange(memberBillShares);
+
     await db.SaveChangesAsync();
 
     return Results.Ok(new { message = "Member removed from household successfully" });
@@ -1269,6 +1281,13 @@ app.MapDelete("/households", async (BillsDbContext db, ClaimsPrincipal user) =>
     {
         bill.HouseholdId = null;
     }
+
+    // Remove all bill shares for bills that belonged to this household
+    var householdBillIds = householdBills.Select(b => b.Id).ToList();
+    var householdBillShares = await db.BillShares
+        .Where(s => householdBillIds.Contains(s.BillId))
+        .ToListAsync();
+    db.BillShares.RemoveRange(householdBillShares);
 
     // Delete the household (invitations will cascade delete automatically)
     db.Households.Remove(household);
