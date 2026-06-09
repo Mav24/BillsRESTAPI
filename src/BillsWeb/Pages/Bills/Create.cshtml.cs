@@ -74,6 +74,6 @@ public class CreateBillModel : PageModel
             return Page();
         }
 
-        return LocalRedirect("/billsweb/bills/index");
+        return LocalRedirect("/billsweb/bills/calendar");
     }
 }

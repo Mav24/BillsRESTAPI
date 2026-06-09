@@ -45,7 +45,7 @@ public class EditBillModel : PageModel
 
         if (bill.IsShared)
         {
-            return LocalRedirect("/billsweb/bills/index");
+            return LocalRedirect("/billsweb/bills/calendar");
         }
 
         Input = bill;
@@ -106,6 +106,6 @@ public class EditBillModel : PageModel
             return Page();
         }
 
-        return LocalRedirect("/billsweb/bills/index");
+        return LocalRedirect("/billsweb/bills/calendar");
     }
 }

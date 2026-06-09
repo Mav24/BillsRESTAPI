@@ -61,16 +61,21 @@ else
     app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-// If the app is hosted under a sub-path (e.g. https://site/billsweb), ensure the app knows its PathBase so
-// redirects and cookie handling work correctly. Only enable in non-development (your production host).
+// UsePathBase MUST be first so all subsequent middleware (routing, static files, HTTPS redirect)
+// see the correct path when hosted under a sub-path (e.g. https://site/billsweb).
 if (!app.Environment.IsDevelopment())
 {
-    // When hosted at /billsweb behind a reverse proxy or IIS virtual application
     app.UsePathBase("/billsweb");
 }
+
+// Skip HTTPS redirect in production when hosted behind a reverse proxy that terminates SSL.
+// The proxy already handles HTTPS on port 443; redirecting internally causes a 443 connection error.
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseStaticFiles();
 
 app.UseRouting();
 app.UseSession();
