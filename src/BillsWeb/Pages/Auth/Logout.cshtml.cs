@@ -11,6 +11,6 @@ public class LogoutModel : PageModel
         HttpContext.Response.Cookies.Delete("BillsWeb.AuthToken");
         HttpContext.Response.Cookies.Delete("BillsWeb.RefreshToken");
         HttpContext.Response.Cookies.Delete("BillsWeb.Username");
-        return LocalRedirect("/billsweb");
+        return RedirectToPage("/Index");
     }
 }

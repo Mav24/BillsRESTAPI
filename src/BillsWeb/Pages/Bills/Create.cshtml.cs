@@ -34,7 +34,7 @@ public class CreateBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         Input.Date = DateTime.Now;
@@ -50,7 +50,7 @@ public class CreateBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         if (!ModelState.IsValid)
@@ -74,6 +74,6 @@ public class CreateBillModel : PageModel
             return Page();
         }
 
-        return LocalRedirect("/billsweb/bills/calendar");
+        return RedirectToPage("/Bills/Calendar");
     }
 }

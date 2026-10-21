@@ -25,7 +25,7 @@ public class RegisterModel : PageModel
     {
         if (HttpContext.Session.GetString("Token") != null)
         {
-            return LocalRedirect("/billsweb/bills/index");
+            return RedirectToPage("/Bills/Calendar");
         }
 
         return Page();
@@ -52,6 +52,6 @@ public class RegisterModel : PageModel
         }
         // Registration succeeded — redirect user to login page. Automatic login caused issues in some hosts.
         System.Diagnostics.Debug.WriteLine("Registration succeeded - redirecting user to login page");
-        return LocalRedirect("/billsweb/auth/login");
+        return RedirectToPage("/Auth/Login");
     }
 }

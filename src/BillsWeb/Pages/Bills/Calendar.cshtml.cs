@@ -33,7 +33,7 @@ public class BillsCalendarModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         var today = DateTime.Today;
@@ -73,7 +73,7 @@ public class BillsCalendarModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         await _apiClient.DeleteBillAsync(id ?? 0, token);

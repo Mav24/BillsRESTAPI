@@ -24,7 +24,7 @@ public class SettingsModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         return Page();
@@ -35,7 +35,7 @@ public class SettingsModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         try
@@ -47,7 +47,7 @@ public class SettingsModel : PageModel
                 // Clear session and redirect to home page
                 HttpContext.Session.Clear();
                 TempData["SuccessMessage"] = "Your account has been successfully deleted.";
-                return LocalRedirect("/billsweb");
+                return RedirectToPage("/Index");
             }
             else
             {

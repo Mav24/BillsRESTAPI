@@ -27,7 +27,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         Household = await _apiClient.GetMyHouseholdAsync(token);
@@ -39,7 +39,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         var success = await _apiClient.CreateHouseholdAsync(name, token);
@@ -61,7 +61,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         var success = await _apiClient.InviteToHouseholdAsync(email, shareExistingBills, token);
@@ -83,7 +83,7 @@ public class HouseholdIndexModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         var success = await _apiClient.LeaveHouseholdAsync(token);

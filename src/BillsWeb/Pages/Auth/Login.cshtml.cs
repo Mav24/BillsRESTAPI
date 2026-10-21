@@ -25,7 +25,7 @@ public class LoginModel : PageModel
     {
         if (HttpContext.Session.GetString("Token") != null)
         {
-            return LocalRedirect("/billsweb/bills/index");
+            return RedirectToPage("/Bills/Calendar");
         }
 
         return Page();
@@ -99,8 +99,8 @@ public class LoginModel : PageModel
             }
             catch { /* best-effort, ignore on failure */ }
 
-            System.Diagnostics.Debug.WriteLine("Login complete, redirecting to /billsweb/bills/index");
-            return LocalRedirect("/billsweb/bills/index");
+            System.Diagnostics.Debug.WriteLine("Login complete, redirecting to /Bills/Calendar");
+            return RedirectToPage("/Bills/Calendar");
         }
         catch (HttpRequestException ex)
         {

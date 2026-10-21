@@ -34,7 +34,7 @@ public class EditBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         var bill = await _apiClient.GetBillAsync(id, token);
@@ -45,7 +45,7 @@ public class EditBillModel : PageModel
 
         if (bill.IsShared)
         {
-            return LocalRedirect("/billsweb/bills/calendar");
+            return RedirectToPage("/Bills/Calendar");
         }
 
         Input = bill;
@@ -82,7 +82,7 @@ public class EditBillModel : PageModel
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrEmpty(token))
         {
-            return LocalRedirect("/billsweb/auth/login");
+            return RedirectToPage("/Auth/Login");
         }
 
         if (!ModelState.IsValid)
@@ -106,6 +106,6 @@ public class EditBillModel : PageModel
             return Page();
         }
 
-        return LocalRedirect("/billsweb/bills/calendar");
+        return RedirectToPage("/Bills/Calendar");
     }
 }

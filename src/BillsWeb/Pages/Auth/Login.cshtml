@@ -6,17 +6,18 @@
 
 @if (Model.LoginSuccess)
 {
-    <meta http-equiv="refresh" content="3; url=/billsweb/bills/index">
+    <meta http-equiv="refresh" content="3; url=@Url.Page("/Bills/Calendar")">
     <div class="alert alert-success" style="margin: 20px; padding: 20px; text-align: center;">
         <h3>? Login Successful!</h3>
         <p>Welcome back! Redirecting to your bills in 3 seconds...</p>
-        <p>If you are not redirected, <a href="/billsweb/bills/index">click here</a>.</p>
+        <p>If you are not redirected, <a asp-page="/Bills/Calendar">click here</a>.</p>
         <p><small>Session ID: @Model.HttpContext.Session.Id</small></p>
     </div>
     <script>
+        var calendarUrl = '@Url.Page("/Bills/Calendar")';
         console.log('Login success page loaded');
         console.log('All cookies:', document.cookie);
-        console.log('Redirecting in 3 seconds to /billsweb/bills/index');
+        console.log('Redirecting in 3 seconds to ' + calendarUrl);
     </script>
 }
 else
