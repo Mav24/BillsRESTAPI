@@ -217,7 +217,7 @@ public class HouseholdsController : ControllerBase
         _db.BillShares.RemoveRange(billShares);
 
         // Check if household is now empty
-        var remainingMembers = await _db.Users.CountAsync(u => u.HouseholdId == householdId);
+        var remainingMembers = await _db.Users.CountAsync(u => u.HouseholdId == householdId && u.Id != userId);
         if (remainingMembers == 0)
         {
             if (household is not null)
@@ -228,7 +228,7 @@ public class HouseholdsController : ControllerBase
         else if (household?.OwnerUserId == userId)
         {
             var nextOwnerId = await _db.Users
-                .Where(u => u.HouseholdId == householdId)
+                .Where(u => u.HouseholdId == householdId && u.Id != userId)
                 .Select(u => u.Id)
                 .FirstOrDefaultAsync();
 

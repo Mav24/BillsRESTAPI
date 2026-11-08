@@ -458,4 +458,89 @@ public class BillsApiTests : IClassFixture<WebApplicationFactory<Program>>, IDis
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task LeaveHousehold_DeletesHousehold_WhenUserIsLastMember()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdId = Guid.NewGuid();
+
+            db.Households.Add(new Household
+            {
+                Id = householdId,
+                Name = "Single Member Household",
+                CreatedAt = DateTime.UtcNow,
+                OwnerUserId = TestAuthHandler.TestUserId
+            });
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            currentUser.HouseholdId = householdId;
+
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsync("/households/leave", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdCount = await db.Households.CountAsync();
+            Assert.Equal(0, householdCount);
+        }
+    }
+
+    [Fact]
+    public async Task LeaveHousehold_TransfersOwner_WhenOwnerLeavesAndMembersRemain()
+    {
+        const string remainingMemberId = "remaining-member-id";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdId = Guid.NewGuid();
+
+            db.Households.Add(new Household
+            {
+                Id = householdId,
+                Name = "Owner Transfer Household",
+                CreatedAt = DateTime.UtcNow,
+                OwnerUserId = TestAuthHandler.TestUserId
+            });
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            currentUser.HouseholdId = householdId;
+
+            db.Users.Add(new User
+            {
+                Id = remainingMemberId,
+                Username = "remaining",
+                Email = "remaining@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+                HouseholdId = householdId
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsync("/households/leave", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var household = await db.Households.SingleAsync();
+            Assert.Equal(remainingMemberId, household.OwnerUserId);
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            Assert.Null(currentUser.HouseholdId);
+        }
+    }
 }

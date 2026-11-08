@@ -1201,7 +1201,7 @@ app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user)
     db.BillShares.RemoveRange(userBillShares);
 
     // Check if household is now empty
-    var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId);
+    var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId && u.Id != userId);
     if (remainingMembers == 0)
     {
         if (household is not null)
@@ -1212,7 +1212,7 @@ app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user)
     else if (household?.OwnerUserId == userId)
     {
         var nextOwnerId = await db.Users
-            .Where(u => u.HouseholdId == householdId)
+            .Where(u => u.HouseholdId == householdId && u.Id != userId)
             .Select(u => u.Id)
             .FirstOrDefaultAsync();
 
