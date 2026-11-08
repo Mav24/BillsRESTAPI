@@ -88,6 +88,8 @@ public class BillsDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.OwnerUserId).HasMaxLength(450);
+            entity.HasIndex(e => e.OwnerUserId);
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

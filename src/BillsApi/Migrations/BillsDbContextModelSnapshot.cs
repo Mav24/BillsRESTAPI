@@ -108,7 +108,13 @@ namespace BillsApi.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OwnerUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
 
                     b.ToTable("Households");
                 });
@@ -144,6 +150,11 @@ namespace BillsApi.Migrations
                         .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("ShareInviterBills")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("TokenHash")
                         .IsRequired()

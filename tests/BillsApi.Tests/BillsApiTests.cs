@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -278,5 +279,183 @@ public class BillsApiTests : IClassFixture<WebApplicationFactory<Program>>, IDis
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveMember_ReturnsForbidden_WhenCurrentUserIsNotHouseholdOwner()
+    {
+        const string ownerUserId = "owner-user-id";
+        const string targetUserId = "target-user-id";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdId = Guid.NewGuid();
+
+            db.Users.Add(new User
+            {
+                Id = ownerUserId,
+                Username = "owner",
+                Email = "owner@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password")
+            });
+
+            db.Households.Add(new Household
+            {
+                Id = householdId,
+                Name = "Test Household",
+                CreatedAt = DateTime.UtcNow,
+                OwnerUserId = ownerUserId
+            });
+
+            db.Users.Add(new User
+            {
+                Id = targetUserId,
+                Username = "target",
+                Email = "target@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+                HouseholdId = householdId
+            });
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            currentUser.HouseholdId = householdId;
+
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.DeleteAsync($"/households/members/{targetUserId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveMember_RemovesMemberAndTheirHouseholdBillData_WhenCurrentUserIsOwner()
+    {
+        const string targetUserId = "target-user-id";
+        const int targetBillId = 501;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdId = Guid.NewGuid();
+
+            db.Households.Add(new Household
+            {
+                Id = householdId,
+                Name = "Owner Household",
+                CreatedAt = DateTime.UtcNow,
+                OwnerUserId = TestAuthHandler.TestUserId
+            });
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            currentUser.HouseholdId = householdId;
+
+            db.Users.Add(new User
+            {
+                Id = targetUserId,
+                Username = "target2",
+                Email = "target2@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+                HouseholdId = householdId
+            });
+
+            db.Bills.Add(new Bill
+            {
+                Id = targetBillId,
+                BillName = "Target Bill",
+                Amount = 100,
+                Date = DateTime.UtcNow,
+                AmountOverMinimum = 0,
+                UserId = targetUserId,
+                HouseholdId = householdId
+            });
+
+            db.BillShares.Add(new BillShare
+            {
+                BillId = targetBillId,
+                SharedByUserId = targetUserId,
+                SharedWithUserId = TestAuthHandler.TestUserId,
+                SharedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.DeleteAsync($"/households/members/{targetUserId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+
+            var removedMember = await db.Users.FindAsync(targetUserId);
+            Assert.NotNull(removedMember);
+            Assert.Null(removedMember.HouseholdId);
+
+            var targetBill = await db.Bills.FindAsync(targetBillId);
+            Assert.NotNull(targetBill);
+            Assert.Null(targetBill.HouseholdId);
+
+            var targetShares = await db.BillShares
+                .Where(s => s.SharedByUserId == targetUserId || s.SharedWithUserId == targetUserId)
+                .ToListAsync();
+            Assert.Empty(targetShares);
+        }
+    }
+
+    [Fact]
+    public async Task InviteToHousehold_ReturnsForbidden_WhenCurrentUserIsNotHouseholdOwner()
+    {
+        const string ownerUserId = "owner-user-id";
+        const string inviteeUserId = "invitee-user-id";
+        const string inviteeEmail = "invitee@example.com";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BillsDbContext>();
+            var householdId = Guid.NewGuid();
+
+            db.Users.Add(new User
+            {
+                Id = ownerUserId,
+                Username = "owner-invite",
+                Email = "owner-invite@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password"),
+                HouseholdId = householdId
+            });
+
+            db.Households.Add(new Household
+            {
+                Id = householdId,
+                Name = "Invite Test Household",
+                CreatedAt = DateTime.UtcNow,
+                OwnerUserId = ownerUserId
+            });
+
+            db.Users.Add(new User
+            {
+                Id = inviteeUserId,
+                Username = "invitee",
+                Email = inviteeEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password")
+            });
+
+            var currentUser = await db.Users.FindAsync(TestAuthHandler.TestUserId);
+            Assert.NotNull(currentUser);
+            currentUser.HouseholdId = householdId;
+
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync("/households/invite", new
+        {
+            email = inviteeEmail,
+            shareExistingBills = false
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

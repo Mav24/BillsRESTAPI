@@ -243,6 +243,14 @@ public class BillsApiClient : IBillsApiClient
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<bool> RemoveHouseholdMemberAsync(string memberId, string token)
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.DeleteAsync($"households/members/{memberId}");
+        return response.IsSuccessStatusCode;
+    }
+
     public async Task<bool> UpdateEmailAsync(string email, string currentPassword, string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

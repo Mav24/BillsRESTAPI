@@ -21,6 +21,11 @@ public class Household
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// The user ID of the main account holder (household creator).
+    /// </summary>
+    public string? OwnerUserId { get; set; }
+
+    /// <summary>
     /// Navigation property for users in this household.
     /// </summary>
     public ICollection<User> Members { get; set; } = new List<User>();

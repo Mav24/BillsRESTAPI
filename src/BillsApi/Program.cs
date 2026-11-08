@@ -887,6 +887,7 @@ app.MapGet("/households/my-household", async (BillsDbContext db, ClaimsPrincipal
         id = userEntity.Household.Id,
         name = userEntity.Household.Name,
         createdAt = userEntity.Household.CreatedAt,
+        ownerUserId = userEntity.Household.OwnerUserId,
         members = userEntity.Household.Members.Select(m => new
         {
             id = m.Id,
@@ -925,7 +926,8 @@ app.MapPost("/households", async (CreateHouseholdRequest request, BillsDbContext
     {
         Id = Guid.NewGuid(),
         Name = request.Name.Trim(),
-        CreatedAt = DateTime.UtcNow
+        CreatedAt = DateTime.UtcNow,
+        OwnerUserId = userId
     };
 
     db.Households.Add(household);
@@ -973,6 +975,17 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
     if (currentUser?.HouseholdId is null)
     {
         return Results.BadRequest(new { error = "You must be in a household to invite others" });
+    }
+
+    var household = await db.Households.FirstOrDefaultAsync(h => h.Id == currentUser.HouseholdId.Value);
+    if (household is null)
+    {
+        return Results.NotFound(new { error = "Household not found" });
+    }
+
+    if (household.OwnerUserId != userId)
+    {
+        return Results.Forbid();
     }
 
     // Check if user with this email exists in database
@@ -1028,7 +1041,7 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
     var acceptUrl = $"{baseUrl}/household-invitation?token={Uri.EscapeDataString(token)}";
 
     var html = $@"
-        <h2>You've been invited to join {currentUser.Household!.Name}!</h2>
+        <h2>You've been invited to join {household.Name}!</h2>
         <p>{currentUser.Username} has invited you to join their household on Bills Tracker.</p>
         <p>By accepting, you'll be able to share and view bills together.</p>
         <p><a href=""{acceptUrl}"" style=""display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;"">Accept Invitation</a></p>
@@ -1038,7 +1051,7 @@ app.MapPost("/households/invite", async (InviteRequest request, BillsDbContext d
 
     try
     {
-        await emailSender.SendAsync(request.Email, $"Invitation to join {currentUser.Household.Name}", html);
+        await emailSender.SendAsync(request.Email, $"Invitation to join {household.Name}", html);
     }
     catch (Exception ex)
     {
@@ -1171,6 +1184,7 @@ app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user)
     }
 
     var householdId = userEntity.HouseholdId.Value;
+    var household = await db.Households.FirstOrDefaultAsync(h => h.Id == householdId);
     userEntity.HouseholdId = null;
 
     // Keep their bills but remove household association
@@ -1190,11 +1204,19 @@ app.MapPost("/households/leave", async (BillsDbContext db, ClaimsPrincipal user)
     var remainingMembers = await db.Users.CountAsync(u => u.HouseholdId == householdId);
     if (remainingMembers == 0)
     {
-        var household = await db.Households.FindAsync(householdId);
         if (household is not null)
         {
             db.Households.Remove(household);
         }
+    }
+    else if (household?.OwnerUserId == userId)
+    {
+        var nextOwnerId = await db.Users
+            .Where(u => u.HouseholdId == householdId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+        household.OwnerUserId = nextOwnerId;
     }
 
     await db.SaveChangesAsync();
@@ -1215,6 +1237,22 @@ app.MapDelete("/households/members/{memberId}", async (string memberId, BillsDbC
         return Results.BadRequest(new { error = "You are not in a household" });
     }
 
+    var household = await db.Households.FirstOrDefaultAsync(h => h.Id == currentUser.HouseholdId.Value);
+    if (household is null)
+    {
+        return Results.NotFound(new { error = "Household not found" });
+    }
+
+    if (household.OwnerUserId != userId)
+    {
+        return Results.Forbid();
+    }
+
+    if (memberId == userId)
+    {
+        return Results.BadRequest(new { error = "Use leave household to remove yourself" });
+    }
+
     var memberToRemove = await db.Users.FirstOrDefaultAsync(u => u.Id == memberId);
 
     if (memberToRemove is null)
@@ -1225,6 +1263,11 @@ app.MapDelete("/households/members/{memberId}", async (string memberId, BillsDbC
     if (memberToRemove.HouseholdId != currentUser.HouseholdId)
     {
         return Results.BadRequest(new { error = "That user is not in your household" });
+    }
+
+    if (memberToRemove.Id == household.OwnerUserId)
+    {
+        return Results.BadRequest(new { error = "You cannot remove the main account holder" });
     }
 
     memberToRemove.HouseholdId = null;

@@ -44,6 +44,7 @@ public class HouseholdsController : ControllerBase
             Id = user.Household.Id,
             Name = user.Household.Name,
             CreatedAt = user.Household.CreatedAt,
+            OwnerUserId = user.Household.OwnerUserId,
             Members = user.Household.Members.Select(m => new HouseholdMemberDto
             {
                 Id = m.Id,
@@ -83,7 +84,8 @@ public class HouseholdsController : ControllerBase
         {
             Id = Guid.NewGuid(),
             Name = dto.Name.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            OwnerUserId = userId
         };
 
         _db.Households.Add(household);
@@ -140,6 +142,17 @@ public class HouseholdsController : ControllerBase
             return BadRequest(new { error = "You must be in a household to invite others" });
         }
 
+        var household = await _db.Households.FirstOrDefaultAsync(h => h.Id == currentUser.HouseholdId.Value);
+        if (household is null)
+        {
+            return NotFound(new { error = "Household not found" });
+        }
+
+        if (household.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
         var invitedUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
         if (invitedUser is null)
@@ -185,6 +198,7 @@ public class HouseholdsController : ControllerBase
         }
 
         var householdId = user.HouseholdId.Value;
+        var household = await _db.Households.FirstOrDefaultAsync(h => h.Id == householdId);
         
         // Remove user from household
         user.HouseholdId = null;
@@ -206,11 +220,19 @@ public class HouseholdsController : ControllerBase
         var remainingMembers = await _db.Users.CountAsync(u => u.HouseholdId == householdId);
         if (remainingMembers == 0)
         {
-            var household = await _db.Households.FindAsync(householdId);
             if (household is not null)
             {
                 _db.Households.Remove(household);
             }
+        }
+        else if (household?.OwnerUserId == userId)
+        {
+            var nextOwnerId = await _db.Users
+                .Where(u => u.HouseholdId == householdId)
+                .Select(u => u.Id)
+                .FirstOrDefaultAsync();
+
+            household.OwnerUserId = nextOwnerId;
         }
 
         await _db.SaveChangesAsync();
@@ -232,6 +254,22 @@ public class HouseholdsController : ControllerBase
             return BadRequest(new { error = "You are not in a household" });
         }
 
+        var household = await _db.Households.FirstOrDefaultAsync(h => h.Id == currentUser.HouseholdId.Value);
+        if (household is null)
+        {
+            return NotFound(new { error = "Household not found" });
+        }
+
+        if (household.OwnerUserId != userId)
+        {
+            return Forbid();
+        }
+
+        if (memberId == userId)
+        {
+            return BadRequest(new { error = "Use leave household to remove yourself" });
+        }
+
         var memberToRemove = await _db.Users.FirstOrDefaultAsync(u => u.Id == memberId);
 
         if (memberToRemove is null)
@@ -242,6 +280,11 @@ public class HouseholdsController : ControllerBase
         if (memberToRemove.HouseholdId != currentUser.HouseholdId)
         {
             return BadRequest(new { error = "That user is not in your household" });
+        }
+
+        if (memberToRemove.Id == household.OwnerUserId)
+        {
+            return BadRequest(new { error = "You cannot remove the main account holder" });
         }
 
         // Remove member

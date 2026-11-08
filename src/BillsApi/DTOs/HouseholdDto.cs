@@ -5,6 +5,7 @@ public class HouseholdDto
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? OwnerUserId { get; set; }
     public List<HouseholdMemberDto> Members { get; set; } = new();
 }
 

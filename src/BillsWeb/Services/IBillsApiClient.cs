@@ -19,6 +19,7 @@ public interface IBillsApiClient
     Task<bool> CreateHouseholdAsync(string name, string token);
     Task<bool> InviteToHouseholdAsync(string email, bool shareExistingBills, string token);
     Task<bool> LeaveHouseholdAsync(string token);
+    Task<bool> RemoveHouseholdMemberAsync(string memberId, string token);
     Task<bool> UpdateEmailAsync(string email, string currentPassword, string token);
     Task<bool> DeleteAccountAsync(string token);
     Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
